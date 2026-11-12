@@ -2,7 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>دفتر التجارة</title>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#0e5c63">
@@ -53,7 +53,8 @@ header.top{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px}
 .brand span{color:var(--muted);font-size:14px;overflow-wrap:anywhere}
 .chip{font-size:13px;padding:3px 10px;border-radius:999px;background:var(--accent-soft);color:var(--accent);white-space:nowrap}
 .chip.warn{background:var(--warn-soft);color:var(--warn)}
-button{font:inherit;cursor:pointer}
+button{font:inherit;cursor:pointer;touch-action:manipulation}
+html{-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
 .btn{border:1px solid var(--accent);background:var(--accent);color:var(--accent-ink);padding:9px 16px;border-radius:8px;font-weight:600}
 .btn.ghost{background:transparent;color:var(--accent)}
 .btn.small{padding:5px 12px;font-size:14px}
@@ -120,11 +121,46 @@ dialog h2{margin:0;font-size:18px}
 #toast.show{opacity:1}
 #toast.err{background:var(--bad);color:#fff}
 @media (max-width:640px){
-  .summary{grid-template-columns:repeat(2,1fr)}
-  .summary .fig:last-child{grid-column:span 2}
+  /* phone: one column, thumb-reach tabs at the bottom, registers as cards instead of wide tables */
+  .wrap{gap:14px;padding:max(16px,env(safe-area-inset-top)) max(14px,env(safe-area-inset-right)) calc(96px + env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left))}
+  .brand{flex:1 1 100%}
+  .brand h1{font-size:24px}
+  header.top{justify-content:space-between}
+  .summary{grid-template-columns:1fr;gap:0;background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .summary .fig{display:flex;align-items:baseline;justify-content:space-between;gap:10px;border:0;border-bottom:1px solid var(--line);border-radius:0;padding:9px 14px}
+  .summary .fig:last-child{border-bottom:0;background:var(--accent-soft)}
+  .summary .fig .lbl{font-size:14px}
+  .summary .fig .val{font-size:17px;white-space:nowrap}
   .fig .val{font-size:19px}
+  nav.tabs{position:fixed;inset-inline:0;bottom:0;z-index:20;gap:0;margin:0;background:var(--surface);border-bottom:0;border-top:1px solid var(--line);padding:6px max(10px,env(safe-area-inset-right)) calc(6px + env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left));box-shadow:0 -4px 14px rgba(0,0,0,.06)}
+  nav.tabs a{margin:0;padding:12px 6px;border-radius:10px;border-bottom:0;font-size:16px}
+  nav.tabs a[aria-current="page"]{background:var(--accent);color:var(--accent-ink)}
+  #toast{bottom:calc(84px + env(safe-area-inset-bottom))}
+  .card{padding:14px}
+  form.entry{grid-template-columns:1fr;gap:10px}
   form.entry .wide{grid-column:auto}
+  input,select{min-height:46px}
+  .btn{min-height:46px}
+  .btn.small{min-height:42px;padding:8px 14px;font-size:15px}
+  .del{min-height:36px;padding:4px 14px;font-size:14px}
+  .bar{flex-direction:column;align-items:stretch}
+  .bar input{max-width:none}
+  .bar .actions,.cust-head .actions{flex-direction:column;align-items:stretch;width:100%}
+  .cust-head{flex-direction:column;align-items:stretch}
+  .link{padding:6px 0}
   .three{grid-template-columns:1fr}
+  .scroll{overflow:visible}
+  table{display:block;min-width:0}
+  thead{display:none}
+  tbody{display:flex;flex-direction:column;gap:8px}
+  tr{display:flex;flex-direction:column;gap:4px;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+  td{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:0;border:0;text-align:start}
+  td:empty{display:none}
+  td[data-label]::before{content:attr(data-label);flex:none;font-size:13px;font-weight:400;color:var(--muted)}
+  td.desc{min-width:0}
+  td.act{justify-content:flex-end;padding-top:4px}
+  tr.total{background:var(--surface);border:1px solid var(--ink);border-bottom:3px double var(--ink)}
+  tr.total td{border:0}
 }
 @media (prefers-reduced-motion:reduce){#toast{transition:none}}
 </style>
@@ -361,7 +397,7 @@ function renderSummary(){
     '<div class="fig due"><div class="lbl">إجمالي المستحقات</div><div class="val">'+money(due)+'</div></div>';
   $('#biz-name').textContent=state.settings.biz||'مشتريات، مبيعات، وحسابات العملاء';
 }
-const mc=(c,cls,strong)=>'<td class="mny'+(cls?' '+cls:'')+'">'+(strong?'<strong>':'')+'<bdi dir="ltr">'+fmt(c)+'</bdi>'+(strong?'</strong>':'')+' <small>'+esc(cur())+'</small></td>';
+const mc=(c,cls,strong)=>'<td class="mny'+(cls?' '+cls:'')+'">'+'<span>'+(strong?'<strong>':'')+'<bdi dir="ltr">'+fmt(c)+'</bdi>'+(strong?'</strong>':'')+' <small>'+esc(cur())+'</small></span></td>';
 const delBtn=(col,id)=>'<button class="del" type="button" data-del="'+col+'" data-id="'+esc(id)+'">حذف</button>';
 function renderSales(){
   const q=norm($('#sales-q').value);
@@ -408,7 +444,19 @@ function renderDetail(c){
     rows.map(r=>'<tr><td class="date">'+esc(r.date)+'</td><td class="desc">'+esc(r.desc)+'</td>'+(r.debit?mc(r.debit):'<td></td>')+(r.credit?mc(r.credit,'credit'):'<td></td>')+mc(r.bal)+'<td>'+delBtn(r.col,r.id)+'</td></tr>').join('')+
     '<tr class="total"><td colspan="2">الإجمالي</td>'+mc(c.debit)+mc(c.credit,'credit')+mc(c.bal)+'<td></td></tr></tbody></table>';
 }
-function renderAll(){renderSummary();renderSales();renderPurchases();renderCustomers();}
+function labelCells(){
+  document.querySelectorAll('.scroll table').forEach(t=>{
+    const heads=Array.from(t.querySelectorAll('thead th')).map(h=>h.textContent.trim());
+    t.querySelectorAll('tbody tr').forEach(tr=>{
+      let i=0;
+      Array.from(tr.cells).forEach(td=>{
+        if(td.colSpan===1){if(heads[i])td.dataset.label=heads[i];else if(td.children.length)td.classList.add('act');}
+        i+=td.colSpan;
+      });
+    });
+  });
+}
+function renderAll(){renderSummary();renderSales();renderPurchases();renderCustomers();labelCells();}
 
 /* ---------- tabs ---------- */
 const TABS=['sales','purchases','customers'];
@@ -417,8 +465,8 @@ function showTab(){
   TABS.forEach(x=>{$('#v-'+x).classList.toggle('on',x===t);});
   document.querySelectorAll('nav.tabs a').forEach(a=>{if(a.dataset.tab===t)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current');});
 }
-window.addEventListener('hashchange',showTab);
-function openCustomer(name){currentCustomer=name;renderCustomers();if(location.hash!=='#customers')location.hash='customers';else showTab();window.scrollTo(0,0);}
+window.addEventListener('hashchange',()=>{showTab();window.scrollTo(0,0);});
+function openCustomer(name){currentCustomer=name;renderCustomers();labelCells();if(location.hash!=='#customers')location.hash='customers';else showTab();window.scrollTo(0,0);}
 
 /* ---------- toast & guards ---------- */
 let toastT;
@@ -486,7 +534,7 @@ $('#cust-img').addEventListener('click',()=>{
   if(!c)return bad('#cust-q',q?'اكتب اسم العميل كاملًا أو اختره من القائمة.':'اكتب اسم العميل في خانة البحث أولًا، ثم اضغط الزر.');
   exportImage(c.name).catch(()=>toast('تعذّر إنشاء الصورة.',true));
 });
-$('#back').addEventListener('click',()=>{currentCustomer=null;renderCustomers();});
+$('#back').addEventListener('click',()=>{currentCustomer=null;renderCustomers();labelCells();window.scrollTo(0,0);});
 
 document.addEventListener('click',async e=>{
   const im=e.target.closest('[data-img]');
