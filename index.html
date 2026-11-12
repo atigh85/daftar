@@ -2,7 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>دفتر التجارة</title>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#0e5c63">
@@ -121,46 +121,11 @@ dialog h2{margin:0;font-size:18px}
 #toast.show{opacity:1}
 #toast.err{background:var(--bad);color:#fff}
 @media (max-width:640px){
-  /* phone: one column, thumb-reach tabs at the bottom, registers as cards instead of wide tables */
-  .wrap{gap:14px;padding:max(16px,env(safe-area-inset-top)) max(14px,env(safe-area-inset-right)) calc(96px + env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left))}
-  .brand{flex:1 1 100%}
-  .brand h1{font-size:24px}
-  header.top{justify-content:space-between}
-  .summary{grid-template-columns:1fr;gap:0;background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden}
-  .summary .fig{display:flex;align-items:baseline;justify-content:space-between;gap:10px;border:0;border-bottom:1px solid var(--line);border-radius:0;padding:9px 14px}
-  .summary .fig:last-child{border-bottom:0;background:var(--accent-soft)}
-  .summary .fig .lbl{font-size:14px}
-  .summary .fig .val{font-size:17px;white-space:nowrap}
+  .summary{grid-template-columns:repeat(2,1fr)}
+  .summary .fig:last-child{grid-column:span 2}
   .fig .val{font-size:19px}
-  nav.tabs{position:fixed;inset-inline:0;bottom:0;z-index:20;gap:0;margin:0;background:var(--surface);border-bottom:0;border-top:1px solid var(--line);padding:6px max(10px,env(safe-area-inset-right)) calc(6px + env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left));box-shadow:0 -4px 14px rgba(0,0,0,.06)}
-  nav.tabs a{margin:0;padding:12px 6px;border-radius:10px;border-bottom:0;font-size:16px}
-  nav.tabs a[aria-current="page"]{background:var(--accent);color:var(--accent-ink)}
-  #toast{bottom:calc(84px + env(safe-area-inset-bottom))}
-  .card{padding:14px}
-  form.entry{grid-template-columns:1fr;gap:10px}
   form.entry .wide{grid-column:auto}
-  input,select{min-height:46px}
-  .btn{min-height:46px}
-  .btn.small{min-height:42px;padding:8px 14px;font-size:15px}
-  .del{min-height:36px;padding:4px 14px;font-size:14px}
-  .bar{flex-direction:column;align-items:stretch}
-  .bar input{max-width:none}
-  .bar .actions,.cust-head .actions{flex-direction:column;align-items:stretch;width:100%}
-  .cust-head{flex-direction:column;align-items:stretch}
-  .link{padding:6px 0}
   .three{grid-template-columns:1fr}
-  .scroll{overflow:visible}
-  table{display:block;min-width:0}
-  thead{display:none}
-  tbody{display:flex;flex-direction:column;gap:8px}
-  tr{display:flex;flex-direction:column;gap:4px;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
-  td{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:0;border:0;text-align:start}
-  td:empty{display:none}
-  td[data-label]::before{content:attr(data-label);flex:none;font-size:13px;font-weight:400;color:var(--muted)}
-  td.desc{min-width:0}
-  td.act{justify-content:flex-end;padding-top:4px}
-  tr.total{background:var(--surface);border:1px solid var(--ink);border-bottom:3px double var(--ink)}
-  tr.total td{border:0}
 }
 @media (prefers-reduced-motion:reduce){#toast{transition:none}}
 </style>
