@@ -13,7 +13,6 @@
 <link rel="icon" href="icons/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Reem+Kufi:wght@600;700&display=swap" rel="stylesheet">
-<script src="lib/xlsx.full.min.js" defer></script>
 <script src="lib/jspdf.umd.min.js" defer></script>
 <style>
 /* Layout idea: a merchant's ledger. Summary strip on top, three working tabs below,
@@ -213,7 +212,6 @@ dialog h2{margin:0;font-size:18px}
           <div class="actions">
             <button class="btn small" id="exp-img" type="button">إرسال الكشف صورة (واتساب)</button>
             <button class="btn ghost small" id="exp-pdf" type="button">تصدير كشف PDF</button>
-            <button class="btn ghost small" id="exp-xlsx" type="button">تصدير Excel</button>
           </div>
         </div>
         <div class="three" id="d-figs"></div>
@@ -542,31 +540,6 @@ async function saveFile(filename,blob,mime){
   setTimeout(()=>URL.revokeObjectURL(url),60000);
   toast('تم تنزيل الملف');
 }
-function exportXlsx(name){
-  if(!window.XLSX){toast('تعذّر تحميل أداة Excel. تحقق من الاتصال وأعد المحاولة.',true);return;}
-  const c=customerList().find(x=>x.name===name),rows=ledger(name),w=balanceWords(c.bal);
-  const aoa=[];
-  if(state.settings.biz)aoa.push([state.settings.biz]);
-  aoa.push(['كشف حساب عميل']);
-  aoa.push(['العميل',name]);
-  if(c.phone)aoa.push(['الهاتف',c.phone]);
-  aoa.push(['تاريخ الإصدار',today()]);
-  aoa.push(['العملة',cur()]);
-  aoa.push([]);
-  aoa.push(['التاريخ','البيان','مستحق (مدين)','مدفوع (دائن)','الرصيد']);
-  rows.forEach(r=>aoa.push([r.date,r.desc,r.debit?r.debit/100:null,r.credit?r.credit/100:null,r.bal/100]));
-  aoa.push(['','الإجمالي',c.debit/100,c.credit/100,c.bal/100]);
-  aoa.push([]);
-  aoa.push([w.label,Math.abs(c.bal)/100]);
-  const ws=XLSX.utils.aoa_to_sheet(aoa);
-  ws['!cols']=[{wch:16},{wch:40},{wch:16},{wch:16},{wch:16}];
-  Object.keys(ws).forEach(k=>{if(k[0]!=='!'&&ws[k].t==='n')ws[k].z='#,##0.00';});
-  const wb=XLSX.utils.book_new();
-  wb.Workbook={Views:[{RTL:true}]};
-  XLSX.utils.book_append_sheet(wb,ws,'كشف حساب');
-  const buf=XLSX.write(wb,{bookType:'xlsx',type:'array'});
-  return saveFile(fileBase(name)+'.xlsx',new Blob([buf]),'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-}
 async function buildStatement(name,asImage){
   if(!asImage&&!window.jspdf){toast('تعذّر تحميل أداة PDF. تحقق من الاتصال وأعد المحاولة.',true);return;}
   const c=customerList().find(x=>x.name===name),w=balanceWords(c.bal),biz=state.settings.biz,issued=today();
@@ -593,8 +566,8 @@ async function buildStatement(name,asImage){
     let y;
     if(pi===0){
       x.fillStyle=ACC;x.fillRect(0,0,W,18);
-      ar(fit(biz||'كشف حساب عميل',font(700,44),TW-340),R,120,font(700,44),ACC);
-      if(biz)ar('كشف حساب عميل',R,172,font(500,28),MUTED);
+      ar(fit(biz||'كشف حساب',font(700,44),TW-340),R,120,font(700,44),ACC);
+      if(biz)ar('كشف حساب',R,172,font(500,28),MUTED);
       ar('تاريخ الإصدار',M,100,font(400,20),MUTED,'left');
       nm(issued,M,134,font(600,26));
       hline(205,LINE,2);
@@ -651,7 +624,6 @@ async function buildStatement(name,asImage){
 const exportPdf=n=>buildStatement(n,false),exportImage=n=>buildStatement(n,true);
 $('#exp-img').addEventListener('click',()=>{if(currentCustomer)exportImage(currentCustomer).catch(()=>toast('تعذّر إنشاء الصورة.',true));});
 $('#exp-pdf').addEventListener('click',()=>{if(currentCustomer)exportPdf(currentCustomer).catch(()=>toast('تعذّر إنشاء الكشف.',true));});
-$('#exp-xlsx').addEventListener('click',()=>{if(currentCustomer){try{exportXlsx(currentCustomer);}catch(e){toast('تعذّر إنشاء الملف.',true);}}});
 
 showTab();renderAll();init();
 })();
