@@ -141,8 +141,8 @@ dialog h2{margin:0;font-size:18px}
   <div class="summary" id="summary"></div>
 
   <nav class="tabs" aria-label="الأقسام">
-    <a href="#sales" data-tab="sales">المبيعات</a>
     <a href="#purchases" data-tab="purchases">المشتريات</a>
+    <a href="#sales" data-tab="sales">المبيعات</a>
     <a href="#customers" data-tab="customers">العملاء</a>
   </nav>
 
@@ -211,7 +211,8 @@ dialog h2{margin:0;font-size:18px}
             <div class="sub" id="d-sub"></div>
           </div>
           <div class="actions">
-            <button class="btn small" id="exp-pdf" type="button">تصدير كشف PDF</button>
+            <button class="btn small" id="exp-img" type="button">إرسال الكشف صورة (واتساب)</button>
+            <button class="btn ghost small" id="exp-pdf" type="button">تصدير كشف PDF</button>
             <button class="btn ghost small" id="exp-xlsx" type="button">تصدير Excel</button>
           </div>
         </div>
@@ -386,8 +387,8 @@ function renderCustomers(){
   const q=norm($('#cust-q').value);
   const rows=all.filter(x=>!q||x.name.includes(q));
   if(!rows.length){$('#cust-list').innerHTML='<p class="empty">'+(q?'لا يوجد عميل بهذا الاسم.':'لا يوجد عملاء بعد. يُضاف العميل تلقائيًا عند تسجيل أول بيع له.')+'</p>';return;}
-  $('#cust-list').innerHTML='<table><thead><tr><th>العميل</th><th class="num">المستحقات</th><th class="num">المدفوعات</th><th class="num">الرصيد</th><th>الحالة</th></tr></thead><tbody>'+
-    rows.map(x=>'<tr><td><button class="link" type="button" data-cust="'+esc(x.name)+'">'+esc(x.name)+'</button></td><td class="num">'+fmt(x.debit)+'</td><td class="num credit">'+fmt(x.credit)+'</td><td class="num"><strong>'+fmt(x.bal)+'</strong></td><td>'+balanceWords(x.bal).pill+'</td></tr>').join('')+
+  $('#cust-list').innerHTML='<table><thead><tr><th>العميل</th><th class="num">المستحقات</th><th class="num">المدفوعات</th><th class="num">الرصيد</th><th>الحالة</th><th></th></tr></thead><tbody>'+
+    rows.map(x=>'<tr><td><button class="link" type="button" data-cust="'+esc(x.name)+'">'+esc(x.name)+'</button></td><td class="num">'+fmt(x.debit)+'</td><td class="num credit">'+fmt(x.credit)+'</td><td class="num"><strong>'+fmt(x.bal)+'</strong></td><td>'+balanceWords(x.bal).pill+'</td><td><button class="btn ghost small" type="button" data-img="'+esc(x.name)+'" style="white-space:nowrap">إرسال صورة</button></td></tr>').join('')+
     '</tbody></table>';
 }
 function renderDetail(c){
@@ -409,7 +410,7 @@ function renderAll(){renderSummary();renderSales();renderPurchases();renderCusto
 /* ---------- tabs ---------- */
 const TABS=['sales','purchases','customers'];
 function showTab(){
-  let t=(location.hash||'').replace('#','');if(TABS.indexOf(t)<0)t='sales';
+  let t=(location.hash||'').replace('#','');if(TABS.indexOf(t)<0)t='purchases';
   TABS.forEach(x=>{$('#v-'+x).classList.toggle('on',x===t);});
   document.querySelectorAll('nav.tabs a').forEach(a=>{if(a.dataset.tab===t)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current');});
 }
@@ -477,6 +478,8 @@ $('#f-pay').addEventListener('submit',async e=>{
 $('#back').addEventListener('click',()=>{currentCustomer=null;renderCustomers();});
 
 document.addEventListener('click',async e=>{
+  const im=e.target.closest('[data-img]');
+  if(im){exportImage(im.dataset.img).catch(()=>toast('تعذّر إنشاء الصورة.',true));return;}
   const c=e.target.closest('[data-cust]');
   if(c){openCustomer(c.dataset.cust);return;}
   const b=e.target.closest('[data-del]');
@@ -564,11 +567,11 @@ function exportXlsx(name){
   const buf=XLSX.write(wb,{bookType:'xlsx',type:'array'});
   return saveFile(fileBase(name)+'.xlsx',new Blob([buf]),'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 }
-async function exportPdf(name){
-  if(!window.jspdf){toast('تعذّر تحميل أداة PDF. تحقق من الاتصال وأعد المحاولة.',true);return;}
+async function buildStatement(name,asImage){
+  if(!asImage&&!window.jspdf){toast('تعذّر تحميل أداة PDF. تحقق من الاتصال وأعد المحاولة.',true);return;}
   const c=customerList().find(x=>x.name===name),w=balanceWords(c.bal),biz=state.settings.biz,issued=today();
   const rows=ledger(name).concat([{total:true}]);
-  const W=1240,H=1754,M=80,RH=46,TW=W-2*M,R=W-M;
+  const W=1240,M=80,RH=46,TW=W-2*M,R=W-M,H=asImage?480+(rows.length+1)*RH+190:1754;
   const INK='#14282b',MUTED='#5a6f73',LINE='#d3dcda',ACC='#0e5c63',GOOD='#17754a';
   const font=(wt,s)=>wt+' '+s+'px "IBM Plex Sans Arabic", Tahoma, Arial, sans-serif';
   try{await Promise.all([400,600,700].map(x=>document.fonts.load(font(x,22),'كشف حساب 123')));}catch(e){}
@@ -578,7 +581,8 @@ async function exportPdf(name){
   const cap1=Math.floor((BOTTOM-START1)/RH)-1,cap2=Math.floor((BOTTOM-START2)/RH)-1;
   const chunks=[rows.slice(0,cap1)];
   for(let i=cap1;i<rows.length;i+=cap2)chunks.push(rows.slice(i,i+cap2));
-  const pdf=new window.jspdf.jsPDF({unit:'pt',format:'a4',compress:true});
+  const pdf=asImage?null:new window.jspdf.jsPDF({unit:'pt',format:'a4',compress:true});
+  let imageCanvas=null;
   chunks.forEach((chunk,pi)=>{
     const cv=document.createElement('canvas');cv.width=W;cv.height=H;const x=cv.getContext('2d');
     const ar=(t,px,py,f,color,align)=>{x.font=f;x.fillStyle=color||INK;x.direction='rtl';x.textAlign=align||'right';x.fillText(t,px,py);};
@@ -636,12 +640,16 @@ async function exportPdf(name){
     });
     hline(H-100,LINE,1);
     ar(fit((biz?biz+' · ':'')+'كشف حساب '+name,font(400,18),TW-220),R,H-64,font(400,18),MUTED);
+    if(asImage){ar('صدر بتاريخ \u202A'+issued+'\u202C',M,H-64,font(400,18),MUTED,'left');imageCanvas=cv;return;}
     ar('صفحة '+(pi+1)+' من '+chunks.length,M,H-64,font(400,18),MUTED,'left');
     if(pi)pdf.addPage();
     pdf.addImage(cv.toDataURL('image/jpeg',0.92),'JPEG',0,0,595.28,841.89);
   });
+  if(asImage){const png=await new Promise(res=>imageCanvas.toBlob(res,'image/png'));return saveFile(fileBase(name)+'.png',png,'image/png');}
   return saveFile(fileBase(name)+'.pdf',new Blob([pdf.output('arraybuffer')]),'application/pdf');
 }
+const exportPdf=n=>buildStatement(n,false),exportImage=n=>buildStatement(n,true);
+$('#exp-img').addEventListener('click',()=>{if(currentCustomer)exportImage(currentCustomer).catch(()=>toast('تعذّر إنشاء الصورة.',true));});
 $('#exp-pdf').addEventListener('click',()=>{if(currentCustomer)exportPdf(currentCustomer).catch(()=>toast('تعذّر إنشاء الكشف.',true));});
 $('#exp-xlsx').addEventListener('click',()=>{if(currentCustomer){try{exportXlsx(currentCustomer);}catch(e){toast('تعذّر إنشاء الملف.',true);}}});
 
