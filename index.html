@@ -357,7 +357,7 @@ function init(){
   checkUpdate();
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')checkUpdate();});
 }
-const BUILD='2026-11-13 02:30';
+const BUILD='2026-11-13 02:39';
 async function checkUpdate(){
   try{
     const r=await fetch('version.txt?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;
@@ -565,7 +565,7 @@ document.addEventListener('click',async e=>{
 });
 
 /* ---------- command box: one sentence in, the matching form filled for review ---------- */
-const nrm=s=>String(s).replace(/[ً-ْـ]/g,'').replace(/[أإآ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه').replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/٫/g,'.').replace(/٬/g,',');
+const nrm=s=>String(s).normalize('NFKC').replace(/[\u064B-\u065F\u0670\u0640\u061C\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/g,'').replace(/[\u06CC\u06CD\u06D0]/g,'\u064A').replace(/\u06A9/g,'\u0643').replace(/[\u06BE\u06C1\u06D5]/g,'\u0647').replace(/[\u06F0-\u06F9]/g,d=>d.charCodeAt(0)-0x06F0).replace(/\u0671/g,'\u0627').replace(/[أإآ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه').replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/٫/g,'.').replace(/٬/g,',');
 const NUM={};
 (function(){
   const add=(w,t,v)=>w.split(' ').forEach(x=>{NUM[x]={t:t,v:v};});
@@ -575,7 +575,7 @@ const NUM={};
   add('ستين ستون','u',60);add('سبعين سبعون','u',70);add('ثمانين ثمانون','u',80);add('تسعين تسعون','u',90);
   add('مائه مئه ميه','h',100);add('مائتين مئتين ميتين مائتان','u',200);
   [['ثلاث',3],['اربع',4],['خمس',5],['ست',6],['سبع',7],['ثمان',8],['تسع',9]].forEach(p=>add(p[0]+'مائه '+p[0]+'مئه '+p[0]+'ميه','u',p[1]*100));
-  add('الف الاف','m',1000);add('الفين الفان','M',2000);add('مليون ملايين','m',1e6);add('مليونين','M',2e6);
+  add('الف الاف الفا','m',1000);add('الفين الفان','M',2000);add('مليون ملايين مليونا','m',1e6);add('مليونين','M',2e6);
   add('نص نصف','f',0.5);add('ربع','f',0.25);
 })();
 const MARK=new Set(['ب','بمبلغ','بقيمه','بسعر','بثمن','مبلغ','قيمه','المبلغ']);
@@ -584,6 +584,7 @@ const KIN=new Set(['ولد','بن','ابن','بنت','منت']);
 const PAYW=new Set(['دفع','ودفع','دفعت','ودفعت','مدفوع','المدفوع','والمدفوع','سلم','وسلم','عربون','وعربون','سدد','وسدد']);
 const PAYV=new Set(['دفع','دفعت','سدد','سددت','سلم','استلمت','استلمنا','قبضت','وصلني']);
 const DAYW=new Set(['امس','البارحه','اليوم']);
+const isCur=n=>n==='اوقيه'||n==='اوقيات'||n==='الاوقيه'||n==='والاوقيه'||n===nrm(cur());
 function numTok(n){
   const tryIt=x=>/^\d[\d,]*(\.\d+)?$/.test(x)?{t:'d',v:parseFloat(x.replace(/,/g,''))}:(NUM[x]||null);
   let r=tryIt(n);if(r)return{t:r.t,v:r.v,b:false};
@@ -632,16 +633,16 @@ function resolveKnown(cand){
   return m.length===1?{name:m[0],known:true}:{name:cand,known:false};
 }
 function parseCommand(text){
-  const T=norm(text).split(' ').filter(Boolean).map(raw=>({raw:raw,n:nrm(raw).replace(/[.،,؛:!؟?]+$/,'')})).filter(t=>t.n);
+  const T=norm(text).split(' ').filter(Boolean).map(raw=>({raw:raw.replace(/[\u061C\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/g,''),n:nrm(raw).replace(/[^\u0621-\u064A0-9.,]/g,'').replace(/[.,]+$/,'')})).filter(t=>t.n);
   if(!T.length)return{error:'اكتب أمرًا أولًا.'};
   let date=today();
   if(T.some(t=>t.n==='امس'||t.n==='البارحه')){const d=new Date();d.setDate(d.getDate()-1);date=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
   const runs=numberRuns(T);
   const text_=(idx)=>idx.map(i=>T[i].raw).join(' ').replace(/[.،,؛:!؟?]+$/,'');
-  const rest=(from,to,skip)=>{const out=[];for(let i=from;i<to;i++){if(skip.has(i)||MARK.has(T[i].n)||DAYW.has(T[i].n))continue;out.push(i);}return out;};
+  const rest=(from,to,skip)=>{const out=[];for(let i=from;i<to;i++){if(skip.has(i)||MARK.has(T[i].n)||DAYW.has(T[i].n)||isCur(T[i].n))continue;out.push(i);}return out;};
   const span=(r,set)=>{if(r)for(let i=r.s;i<r.e;i++)set.add(i);};
-  const isSale=t=>t.n.startsWith('بعت')||['بيع','مبيعات','بعنا','بايع'].includes(t.n);
-  const isBuy=t=>t.n.startsWith('اشتري')||t.n.startsWith('شريت')||['شراء','مشتريات','شرينا'].includes(t.n);
+  const isSale=t=>t.n.startsWith('بعت')||t.n.startsWith('وبعت')||['بيع','مبيعات','بعنا','بايع'].includes(t.n);
+  const isBuy=t=>t.n.includes('اشتري')||t.n.startsWith('شريت')||['شراء','مشتريات','شرينا'].includes(t.n);
   // statement
   if(T.some(t=>t.n==='كشف')){
     let c=findCustomer(T,0,T.length);
