@@ -84,6 +84,7 @@ form.entry{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))
 form.entry .wide{grid-column:span 2}
 label.f{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted);min-width:0}
 input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:9px 10px;width:100%;min-width:0}
+input[type="date"]{-webkit-appearance:none;appearance:none;display:block;min-height:44px;text-align:start}
 input.amt{direction:ltr;text-align:right;font-variant-numeric:tabular-nums}
 .bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:10px}
 .bar h2{margin:0}
@@ -126,6 +127,11 @@ dialog h2{margin:0;font-size:18px}
   .fig .val{font-size:19px}
   form.entry .wide{grid-column:auto}
   .three{grid-template-columns:1fr}
+  table{min-width:0;font-size:14px}
+  th,td{padding:8px 6px}
+  .mny{white-space:normal}
+  .mny bdi{white-space:nowrap}
+  #d-ledger table{min-width:540px}
 }
 @media (prefers-reduced-motion:reduce){#toast{transition:none}}
 </style>
