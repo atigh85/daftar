@@ -252,6 +252,7 @@ dialog h2{margin:0;font-size:18px}
     <label class="f">اسم المنشأة (يظهر في أعلى كشف الحساب)<input type="text" id="set-biz"></label>
     <label class="f">العملة<input type="text" id="set-cur" maxlength="12"></label>
     <div style="border-top:1px solid var(--line);padding-top:12px;display:flex;flex-direction:column;gap:8px">
+      <span class="note" id="app-version"></span>
       <strong style="font-size:14px">النسخ الاحتياطي</strong>
       <span class="note">البيانات محفوظة على هذا الجهاز فقط. نزّل نسخة احتياطية بانتظام، واستعملها لنقل البيانات إلى جهاز آخر.</span>
       <div class="actions">
@@ -329,6 +330,22 @@ function init(){
   renderAll();
   try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();}catch(e){}
   if('serviceWorker' in navigator&&location.protocol==='https:'){navigator.serviceWorker.register('sw.js').catch(()=>{});}
+  const vEl=document.getElementById('app-version');if(vEl)vEl.textContent='الإصدار '+BUILD;
+  checkUpdate();
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')checkUpdate();});
+}
+const BUILD='2026-11-13 01:48';
+async function checkUpdate(){
+  try{
+    const r=await fetch('version.txt?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;
+    const v=(await r.text()).trim();
+    if(!v||v===BUILD)return;
+    try{if(sessionStorage.getItem('upd')===v)return;sessionStorage.setItem('upd',v);}catch(e){}
+    if(window.caches){const ks=await caches.keys();await Promise.all(ks.map(k=>caches.delete(k)));}
+    await Promise.all(['./','index.html','sw.js','lib/jspdf.umd.min.js'].map(u=>fetch(u,{cache:'reload'}).catch(()=>{})));
+    if(navigator.serviceWorker){const reg=await navigator.serviceWorker.getRegistration();if(reg)await reg.update().catch(()=>{});}
+    location.reload();
+  }catch(e){}
 }
 
 /* ---------- derived data ---------- */
