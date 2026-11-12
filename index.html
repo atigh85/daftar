@@ -63,7 +63,7 @@ button{font:inherit;cursor:pointer}
 .del.armed,.btn.armed{border-color:var(--bad);background:var(--bad-soft);color:var(--bad)}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
-.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
 .fig{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px;min-width:0}
 .fig .lbl{font-size:13px;color:var(--muted)}
 .fig .val{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;overflow-wrap:anywhere;line-height:1.35}
@@ -92,6 +92,8 @@ table{border-collapse:collapse;width:100%;min-width:480px;font-size:15px}
 th{font-size:13px;color:var(--muted);font-weight:600;text-align:start;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
 td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
 td.desc{overflow-wrap:anywhere;min-width:140px}
+.mny{text-align:left;white-space:nowrap;font-variant-numeric:tabular-nums}
+.mny small{font-size:12px;color:var(--muted);font-weight:400}
 .num{direction:ltr;unicode-bidi:isolate;text-align:left;font-variant-numeric:tabular-nums;white-space:nowrap}
 th.num{direction:rtl}
 td.date{white-space:nowrap;font-variant-numeric:tabular-nums;color:var(--muted)}
@@ -119,6 +121,7 @@ dialog h2{margin:0;font-size:18px}
 #toast.err{background:var(--bad);color:#fff}
 @media (max-width:640px){
   .summary{grid-template-columns:repeat(2,1fr)}
+  .summary .fig:last-child{grid-column:span 2}
   .fig .val{font-size:19px}
   form.entry .wide{grid-column:auto}
   .three{grid-template-columns:1fr}
@@ -196,7 +199,7 @@ dialog h2{margin:0;font-size:18px}
         </details>
       </div>
       <div class="card">
-        <div class="bar"><h2>سجل العملاء</h2><input type="search" id="cust-q" placeholder="بحث بالاسم" aria-label="بحث في العملاء"></div>
+        <div class="bar"><h2>سجل العملاء</h2><div class="actions"><input type="search" id="cust-q" list="cust-names" autocomplete="off" placeholder="اكتب اسم العميل" aria-label="بحث في العملاء"><button class="btn small" id="cust-img" type="button">إرسال الكشف صورة (واتساب)</button></div></div>
         <div class="scroll" id="cust-list"></div>
       </div>
     </div>
@@ -271,7 +274,7 @@ let db=null,downloads=null,ready=false,seq=0,currentCustomer=null;
 /* ---------- money & dates ---------- */
 const cents=n=>Math.round((Number(n)||0)*100);
 const sumC=a=>a.reduce((t,x)=>t+cents(x.amount),0);
-const fmt=c=>(c/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmt=c=>(c/100).toLocaleString('en-US',{minimumFractionDigits:c%100?2:0,maximumFractionDigits:2});
 const cur=()=>state.settings.cur||'';
 function parseAmount(v){
   const s=String(v).trim()
@@ -348,31 +351,33 @@ function balanceWords(bal){
 /* ---------- rendering ---------- */
 const money=c=>'<span class="num">'+fmt(c)+'</span> <small>'+esc(cur())+'</small>';
 function renderSummary(){
-  const s=sumC(state.sales),p=sumC(state.purchases);
+  const s=sumC(state.sales),p=sumC(state.purchases),paid=sumC(state.payments);
   const due=customerList().reduce((t,c)=>t+(c.bal>0?c.bal:0),0);
   $('#summary').innerHTML=
-    '<div class="fig"><div class="lbl">إجمالي المبيعات</div><div class="val">'+money(s)+'</div></div>'+
     '<div class="fig"><div class="lbl">إجمالي المشتريات</div><div class="val">'+money(p)+'</div></div>'+
-    '<div class="fig"><div class="lbl">الفرق (مبيعات − مشتريات)</div><div class="val">'+money(s-p)+'</div></div>'+
-    '<div class="fig due"><div class="lbl">مستحق على العملاء</div><div class="val">'+money(due)+'</div></div>';
+    '<div class="fig"><div class="lbl">إجمالي المبيعات</div><div class="val">'+money(s)+'</div></div>'+
+    '<div class="fig"><div class="lbl">صافي الربح</div><div class="val">'+money(s-p)+'</div></div>'+
+    '<div class="fig"><div class="lbl">إجمالي المدفوعات</div><div class="val credit">'+money(paid)+'</div></div>'+
+    '<div class="fig due"><div class="lbl">إجمالي المستحقات</div><div class="val">'+money(due)+'</div></div>';
   $('#biz-name').textContent=state.settings.biz||'مشتريات، مبيعات، وحسابات العملاء';
 }
+const mc=(c,cls,strong)=>'<td class="mny'+(cls?' '+cls:'')+'">'+(strong?'<strong>':'')+'<bdi dir="ltr">'+fmt(c)+'</bdi>'+(strong?'</strong>':'')+' <small>'+esc(cur())+'</small></td>';
 const delBtn=(col,id)=>'<button class="del" type="button" data-del="'+col+'" data-id="'+esc(id)+'">حذف</button>';
 function renderSales(){
   const q=norm($('#sales-q').value);
   const rows=state.sales.filter(r=>!q||(r.customer||'').includes(q)||(r.desc||'').includes(q)).sort(byNewest);
   if(!rows.length){$('#sales-list').innerHTML='<p class="empty">'+(q?'لا توجد نتائج مطابقة.':'لا توجد مبيعات بعد. سجّل أول عملية بيع من النموذج أعلاه.')+'</p>';return;}
   $('#sales-list').innerHTML='<table><thead><tr><th>التاريخ</th><th>العميل</th><th>البيان</th><th class="num">قيمة البيع</th><th></th></tr></thead><tbody>'+
-    rows.map(r=>'<tr><td class="date">'+esc(r.date)+'</td><td><button class="link" type="button" data-cust="'+esc(r.customer)+'">'+esc(r.customer)+'</button></td><td class="desc">'+esc(r.desc)+'</td><td class="num">'+fmt(cents(r.amount))+'</td><td>'+delBtn('sales',r.id)+'</td></tr>').join('')+
-    '<tr class="total"><td colspan="3">الإجمالي</td><td class="num">'+fmt(sumC(rows))+'</td><td></td></tr></tbody></table>';
+    rows.map(r=>'<tr><td class="date">'+esc(r.date)+'</td><td><button class="link" type="button" data-cust="'+esc(r.customer)+'">'+esc(r.customer)+'</button></td><td class="desc">'+esc(r.desc)+'</td>'+mc(cents(r.amount))+'<td>'+delBtn('sales',r.id)+'</td></tr>').join('')+
+    '<tr class="total"><td colspan="3">الإجمالي</td>'+mc(sumC(rows))+'<td></td></tr></tbody></table>';
 }
 function renderPurchases(){
   const q=norm($('#purch-q').value);
   const rows=state.purchases.filter(r=>!q||(r.desc||'').includes(q)).sort(byNewest);
   if(!rows.length){$('#purch-list').innerHTML='<p class="empty">'+(q?'لا توجد نتائج مطابقة.':'لا توجد مشتريات بعد. سجّل أول عملية شراء من النموذج أعلاه.')+'</p>';return;}
   $('#purch-list').innerHTML='<table><thead><tr><th>التاريخ</th><th>البيان</th><th class="num">قيمة الشراء</th><th></th></tr></thead><tbody>'+
-    rows.map(r=>'<tr><td class="date">'+esc(r.date)+'</td><td class="desc">'+esc(r.desc)+'</td><td class="num">'+fmt(cents(r.amount))+'</td><td>'+delBtn('purchases',r.id)+'</td></tr>').join('')+
-    '<tr class="total"><td colspan="2">الإجمالي</td><td class="num">'+fmt(sumC(rows))+'</td><td></td></tr></tbody></table>';
+    rows.map(r=>'<tr><td class="date">'+esc(r.date)+'</td><td class="desc">'+esc(r.desc)+'</td>'+mc(cents(r.amount))+'<td>'+delBtn('purchases',r.id)+'</td></tr>').join('')+
+    '<tr class="total"><td colspan="2">الإجمالي</td>'+mc(sumC(rows))+'<td></td></tr></tbody></table>';
 }
 function renderCustomers(){
   const all=customerList();
@@ -385,8 +390,8 @@ function renderCustomers(){
   const q=norm($('#cust-q').value);
   const rows=all.filter(x=>!q||x.name.includes(q));
   if(!rows.length){$('#cust-list').innerHTML='<p class="empty">'+(q?'لا يوجد عميل بهذا الاسم.':'لا يوجد عملاء بعد. يُضاف العميل تلقائيًا عند تسجيل أول بيع له.')+'</p>';return;}
-  $('#cust-list').innerHTML='<table><thead><tr><th>العميل</th><th class="num">المستحقات</th><th class="num">المدفوعات</th><th class="num">الرصيد</th><th>الحالة</th><th></th></tr></thead><tbody>'+
-    rows.map(x=>'<tr><td><button class="link" type="button" data-cust="'+esc(x.name)+'">'+esc(x.name)+'</button></td><td class="num">'+fmt(x.debit)+'</td><td class="num credit">'+fmt(x.credit)+'</td><td class="num"><strong>'+fmt(x.bal)+'</strong></td><td>'+balanceWords(x.bal).pill+'</td><td><button class="btn ghost small" type="button" data-img="'+esc(x.name)+'" style="white-space:nowrap">إرسال صورة</button></td></tr>').join('')+
+  $('#cust-list').innerHTML='<table><thead><tr><th>العميل</th><th class="num">المستحقات</th><th class="num">المدفوعات</th><th class="num">الرصيد</th><th>الحالة</th></tr></thead><tbody>'+
+    rows.map(x=>'<tr><td><button class="link" type="button" data-cust="'+esc(x.name)+'">'+esc(x.name)+'</button></td>'+mc(x.debit)+mc(x.credit,'credit')+mc(x.bal,'',1)+'<td>'+balanceWords(x.bal).pill+'</td></tr>').join('')+
     '</tbody></table>';
 }
 function renderDetail(c){
@@ -400,8 +405,8 @@ function renderDetail(c){
     '<div class="fig due"><div class="lbl">'+w.label+'</div><div class="val">'+money(Math.abs(c.bal))+'</div></div>';
   if(!rows.length){$('#d-ledger').innerHTML='<p class="empty">لا توجد حركات على هذا الحساب بعد.</p>';return;}
   $('#d-ledger').innerHTML='<table><thead><tr><th>التاريخ</th><th>البيان</th><th class="num">مستحق (مدين)</th><th class="num">مدفوع (دائن)</th><th class="num">الرصيد</th><th></th></tr></thead><tbody>'+
-    rows.map(r=>'<tr><td class="date">'+esc(r.date)+'</td><td class="desc">'+esc(r.desc)+'</td><td class="num">'+(r.debit?fmt(r.debit):'')+'</td><td class="num credit">'+(r.credit?fmt(r.credit):'')+'</td><td class="num">'+fmt(r.bal)+'</td><td>'+delBtn(r.col,r.id)+'</td></tr>').join('')+
-    '<tr class="total"><td colspan="2">الإجمالي</td><td class="num">'+fmt(c.debit)+'</td><td class="num credit">'+fmt(c.credit)+'</td><td class="num">'+fmt(c.bal)+'</td><td></td></tr></tbody></table>';
+    rows.map(r=>'<tr><td class="date">'+esc(r.date)+'</td><td class="desc">'+esc(r.desc)+'</td>'+(r.debit?mc(r.debit):'<td></td>')+(r.credit?mc(r.credit,'credit'):'<td></td>')+mc(r.bal)+'<td>'+delBtn(r.col,r.id)+'</td></tr>').join('')+
+    '<tr class="total"><td colspan="2">الإجمالي</td>'+mc(c.debit)+mc(c.credit,'credit')+mc(c.bal)+'<td></td></tr></tbody></table>';
 }
 function renderAll(){renderSummary();renderSales();renderPurchases();renderCustomers();}
 
@@ -473,6 +478,14 @@ $('#f-pay').addEventListener('submit',async e=>{
 });
 
 ['#sales-q','#purch-q','#cust-q'].forEach(s=>{$(s).addEventListener('input',renderAll);});
+$('#cust-img').addEventListener('click',()=>{
+  const q=norm($('#cust-q').value),all=customerList();
+  let c=all.find(x=>x.name===q);
+  if(!c&&q){const m=all.filter(x=>x.name.includes(q));if(m.length===1)c=m[0];}
+  if(!c&&!q&&all.length===1)c=all[0];
+  if(!c)return bad('#cust-q',q?'اكتب اسم العميل كاملًا أو اختره من القائمة.':'اكتب اسم العميل في خانة البحث أولًا، ثم اضغط الزر.');
+  exportImage(c.name).catch(()=>toast('تعذّر إنشاء الصورة.',true));
+});
 $('#back').addEventListener('click',()=>{currentCustomer=null;renderCustomers();});
 
 document.addEventListener('click',async e=>{
@@ -548,7 +561,8 @@ async function buildStatement(name,asImage){
   const INK='#14282b',MUTED='#5a6f73',LINE='#d3dcda',ACC='#0e5c63',GOOD='#17754a';
   const font=(wt,s)=>wt+' '+s+'px "IBM Plex Sans Arabic", Tahoma, Arial, sans-serif';
   try{await Promise.all([400,600,700].map(x=>document.fonts.load(font(x,22),'كشف حساب 123')));}catch(e){}
-  const cols=[{k:'date',w:170,label:'التاريخ'},{k:'desc',w:430,label:'البيان'},{k:'debit',w:160,label:'مستحق (مدين)',n:1},{k:'credit',w:160,label:'مدفوع (دائن)',n:1},{k:'bal',w:160,label:'الرصيد',n:1}];
+  const cols=[{k:'date',w:150,label:'التاريخ'},{k:'desc',w:330,label:'البيان'},{k:'debit',w:200,label:'مستحق (مدين)',n:1},{k:'credit',w:200,label:'مدفوع (دائن)',n:1},{k:'bal',w:200,label:'الرصيد',n:1}];
+  const mv=v=>'\u202A'+fmt(v)+'\u202C '+cur();
   let edge=R;cols.forEach(col=>{col.r=edge;col.l=edge-col.w;edge=col.l;});
   const START1=480,START2=150,BOTTOM=H-190;
   const cap1=Math.floor((BOTTOM-START1)/RH)-1,cap2=Math.floor((BOTTOM-START2)/RH)-1;
@@ -594,9 +608,9 @@ async function buildStatement(name,asImage){
       if(r.total){
         hline(y,INK,2);
         ar('الإجمالي',cols[1].r-14,y+31,font(700,22));
-        nm(fmt(c.debit),cols[2].l+14,y+31,font(700,21));
-        nm(fmt(c.credit),cols[3].l+14,y+31,font(700,21),GOOD);
-        nm(fmt(c.bal),cols[4].l+14,y+31,font(700,21));
+        ar(mv(c.debit),cols[2].l+14,y+31,font(700,21),INK,'left');
+        ar(mv(c.credit),cols[3].l+14,y+31,font(700,21),GOOD,'left');
+        ar(mv(c.bal),cols[4].l+14,y+31,font(700,21),INK,'left');
         hline(y+RH-5,INK,1.5);hline(y+RH,INK,1.5);
         const line=c.bal>0?'المستحق على العميل حتى تاريخ الإصدار':c.bal<0?'رصيد زائد للعميل حتى تاريخ الإصدار':'الحساب مسدَّد بالكامل حتى تاريخ الإصدار';
         ar(line+(c.bal?':  '+fmt(Math.abs(c.bal))+' '+cur():''),R,y+RH+58,font(700,26),ACC);
@@ -605,9 +619,9 @@ async function buildStatement(name,asImage){
       if(i%2){x.fillStyle='#f5f8f7';x.fillRect(M,y,TW,RH);}
       ar(r.date,cols[0].r-14,y+30,font(400,20),MUTED);
       ar(fit(r.desc,font(400,21),cols[1].w-28),cols[1].r-14,y+30,font(400,21));
-      if(r.debit)nm(fmt(r.debit),cols[2].l+14,y+30,font(400,21));
-      if(r.credit)nm(fmt(r.credit),cols[3].l+14,y+30,font(400,21),GOOD);
-      nm(fmt(r.bal),cols[4].l+14,y+30,font(500,21));
+      if(r.debit)ar(mv(r.debit),cols[2].l+14,y+30,font(400,21),INK,'left');
+      if(r.credit)ar(mv(r.credit),cols[3].l+14,y+30,font(400,21),GOOD,'left');
+      ar(mv(r.bal),cols[4].l+14,y+30,font(500,21),INK,'left');
       hline(y+RH,LINE,1);
       y+=RH;
     });
