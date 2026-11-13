@@ -24,7 +24,6 @@
 <meta name="twitter:image" content="https://atigh85.github.io/daftar/icons/icon-512.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Reem+Kufi:wght@600;700&display=swap" rel="stylesheet">
-<script src="lib/jspdf.umd.min.js" defer></script>
 <style>
 /* Layout idea: a merchant's ledger. Summary strip on top, three working tabs below,
    each tab is "entry form above, register below". Debit/credit columns and the
@@ -120,6 +119,16 @@ th.num{direction:rtl}
 td.date{white-space:nowrap;font-variant-numeric:tabular-nums;color:var(--muted)}
 tr.total td{border-top:1px solid var(--ink);border-bottom:3px double var(--ink);font-weight:700}
 .credit{color:var(--good)}
+table.led{min-width:0}
+table.led th,table.led td{vertical-align:middle}
+table.led th+th,table.led td+td{border-inline-start:1px solid var(--line)}
+table.led tbody tr.pay td{background:var(--good-soft)}
+table.led .what{display:block;font-weight:600}
+table.led .meta{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;margin-top:3px}
+table.led .c-main{overflow-wrap:normal;word-break:normal}
+table.led .meta .date{display:inline;font-size:12px;white-space:nowrap}
+table.led .meta .del{margin:0;padding:1px 8px;font-size:12px;min-height:0}
+table.led tr.total td{background:var(--surface)}
 .c-main .date{display:block;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
 .c-main .del{margin-inline-start:8px}
 .c-main{overflow-wrap:anywhere}
@@ -168,6 +177,10 @@ dialog h2{margin:0;font-size:18px}
   .date .y{display:none}
   .mny small{font-size:11px}
   .del{padding:2px 7px;font-size:12px}
+  table.led{font-size:12px}
+  table.led th,table.led td{padding:8px 4px}
+  table.led .meta .date{font-size:11px}
+  table.led .mny small{font-size:9px}
   /* wide registers: name/description on one line, the three amounts on the line below */
   table.two,table.two thead,table.two tbody{display:block}
   table.two tr{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));column-gap:6px;padding:7px 0;border-bottom:1px solid var(--line)}
@@ -280,7 +293,7 @@ dialog h2{margin:0;font-size:18px}
           </div>
           <div class="actions">
             <button class="btn small" id="exp-img" type="button">إرسال الكشف صورة (واتساب)</button>
-            <button class="btn ghost small" id="exp-pdf" type="button">تصدير كشف PDF</button>
+            <button class="btn ghost small" id="exp-debt" type="button">باقي الدين</button>
           </div>
         </div>
         <div class="three" id="d-figs"></div>
@@ -330,11 +343,11 @@ dialog h2{margin:0;font-size:18px}
 </dialog>
 
 <dialog id="pv">
-  <h2>راجع الكشف قبل إرساله</h2>
+  <h2>راجع قبل الإرسال</h2>
   <div id="pv-body"></div>
   <div class="actions" style="justify-content:flex-end">
     <button class="btn ghost small" type="button" id="pv-cancel">إلغاء</button>
-    <button class="btn small" type="button" id="pv-ok">إرسال الكشف</button>
+    <button class="btn small" type="button" id="pv-ok">إرسال</button>
   </div>
 </dialog>
 
@@ -406,7 +419,7 @@ function init(){
   checkUpdate();
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')checkUpdate();});
 }
-const BUILD='2026-11-13 13:33';
+const BUILD='2026-11-13 22:17';
 async function checkUpdate(){
   try{
     const r=await fetch('version.txt?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;
@@ -414,7 +427,7 @@ async function checkUpdate(){
     if(!v||v===BUILD)return;
     try{if(sessionStorage.getItem('upd')===v)return;sessionStorage.setItem('upd',v);}catch(e){}
     if(window.caches){const ks=await caches.keys();await Promise.all(ks.map(k=>caches.delete(k)));}
-    await Promise.all(['./','index.html','sw.js','lib/jspdf.umd.min.js'].map(u=>fetch(u,{cache:'reload'}).catch(()=>{})));
+    await Promise.all(['./','index.html','sw.js'].map(u=>fetch(u,{cache:'reload'}).catch(()=>{})));
     if(navigator.serviceWorker){const reg=await navigator.serviceWorker.getRegistration();if(reg)await reg.update().catch(()=>{});}
     location.reload();
   }catch(e){}
@@ -433,9 +446,17 @@ function customerList(){
 }
 function ledger(name){
   const rows=state.sales.filter(s=>s.customer===name).map(s=>({date:s.date,desc:s.desc||'بيع',debit:cents(s.amount),credit:0,t:s.createdAt||0,col:'sales',id:s.id}))
-    .concat(state.payments.filter(p=>p.customer===name).map(p=>({date:p.date,desc:p.desc||'دفعة',debit:0,credit:cents(p.amount),t:p.createdAt||0,col:'payments',id:p.id})));
+    .concat(state.payments.filter(p=>p.customer===name).map(p=>({date:p.date,desc:p.desc||'دفعة',debit:0,credit:cents(p.amount),t:p.createdAt||0,col:'payments',id:p.id,at:!!p.atSale})));
   rows.sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:a.t-b.t);
-  let bal=0;rows.forEach(r=>{bal+=r.debit-r.credit;r.bal=bal;});
+  let bal=0,k=0;
+  rows.forEach(r=>{
+    bal+=r.debit-r.credit;r.bal=bal;
+    if(r.col==='payments'){
+      k++;const at=r.at||r.desc.indexOf('دفعة عند البيع')===0;
+      const extra=(at||r.desc==='دفعة')?'':r.desc;
+      r.desc='دفعة '+k+(at?' (عند البيع)':'')+(extra?' - '+extra:'');
+    }
+  });
   return rows;
 }
 function balanceWords(bal){
@@ -454,7 +475,7 @@ function renderSummary(){
     '<div class="fig"><div class="lbl">إجمالي المبيعات</div><div class="val">'+money(s)+'</div></div>'+
     '<div class="fig"><div class="lbl">صافي الربح</div><div class="val">'+money(s-p)+'</div></div>'+
     '<div class="fig"><div class="lbl">إجمالي المدفوعات</div><div class="val credit">'+money(paid)+'</div></div>'+
-    '<div class="fig due"><div class="lbl">إجمالي المستحقات</div><div class="val">'+money(due)+'</div></div>';
+    '<div class="fig due"><div class="lbl">إجمالي المستحقات (الدين)</div><div class="val">'+money(due)+'</div></div>';
   $('#biz-name').textContent=state.settings.biz||'مشتريات، مبيعات، وحسابات العملاء';
 }
 const mc=(c,cls,strong)=>'<td class="mny'+(cls?' '+cls:'')+'">'+'<span>'+(strong?'<strong>':'')+'<bdi dir="ltr">'+fmt(c)+'</bdi>'+(strong?'</strong>':'')+' <small>'+esc(cur())+'</small></span></td>';
@@ -506,9 +527,9 @@ function renderDetail(c){
     '<div class="fig"><div class="lbl">إجمالي المدفوعات</div><div class="val credit">'+money(c.credit)+'</div></div>'+
     '<div class="fig due"><div class="lbl">'+w.label+'</div><div class="val">'+money(Math.abs(c.bal))+'</div></div>';
   if(!rows.length){$('#d-ledger').innerHTML='<p class="empty">لا توجد حركات على هذا الحساب بعد.</p>';return;}
-  $('#d-ledger').innerHTML='<table class="two"><thead><tr><th class="c-main">البيان</th><th class="num">مستحق</th><th class="num">مدفوع</th><th class="num">الباقي</th></tr></thead><tbody>'+
-    rows.map(r=>'<tr><td class="c-main"><span class="date">'+dt(r.date)+'</span>'+esc(r.desc)+' '+delBtn(r.col,r.id)+'</td>'+(r.debit?mc(r.debit):'<td></td>')+(r.credit?mc(r.credit,'credit'):'<td></td>')+mc(r.bal)+'</tr>').join('')+
-    '<tr class="total"><td class="c-main">الباقي</td><td></td><td></td>'+mc(c.bal,'',1)+'</tr></tbody></table>';
+  $('#d-ledger').innerHTML='<table class="led"><thead><tr><th>البيان</th><th class="num">ثمن البيع</th><th class="num">المدفوع</th><th class="num">الباقي</th></tr></thead><tbody>'+
+    rows.map(r=>'<tr class="'+(r.credit?'pay':'sale')+'"><td class="c-main"><span class="what">'+esc(r.desc)+'</span><span class="meta"><span class="date">'+dt(r.date)+'</span>'+delBtn(r.col,r.id)+'</span></td>'+(r.debit?mc(r.debit):'<td></td>')+(r.credit?mc(r.credit,'credit'):'<td></td>')+mc(r.bal,'',1)+'</tr>').join('')+
+    '<tr class="total"><td colspan="3">'+w.label+'</td>'+mc(Math.abs(c.bal),'',1)+'</tr></tbody></table>';
 }
 function labelCells(){
   document.querySelectorAll('.scroll table').forEach(t=>{
@@ -567,7 +588,7 @@ $('#f-sale').addEventListener('submit',async e=>{
     await ensureCustomer(customer);
     const t=Date.now();
     await addDoc('sales',{date:date,customer:customer,desc:desc,amount:amount,createdAt:t});
-    if(paid>0)await addDoc('payments',{date:date,customer:customer,desc:'دفعة عند البيع: '+desc,amount:paid,createdAt:t+1});
+    if(paid>0)await addDoc('payments',{date:date,customer:customer,desc:'دفعة عند البيع: '+desc,atSale:true,amount:paid,createdAt:t+1});
     ['#s-cust','#s-desc','#s-amt','#s-paid'].forEach(s=>{$(s).value='';});
     toast('أُضيف البيع إلى حساب '+customer);
   }catch(err){saveFailed(err);}
@@ -914,7 +935,7 @@ async function buildStatement(name,asImage){
   const INK='#14282b',MUTED='#5a6f73',LINE='#d3dcda',ACC='#0e5c63',GOOD='#17754a';
   const font=(wt,s)=>wt+' '+s+'px "IBM Plex Sans Arabic", Tahoma, Arial, sans-serif';
   try{await Promise.all([400,600,700].map(x=>document.fonts.load(font(x,22),'كشف حساب 123')));}catch(e){}
-  const cols=[{k:'date',w:190,label:'التاريخ'},{k:'desc',w:290,label:'البيان'},{k:'debit',w:200,label:'مستحق',n:1},{k:'credit',w:200,label:'مدفوع',n:1},{k:'bal',w:200,label:'الباقي',n:1}];
+  const cols=[{k:'date',w:190,label:'التاريخ'},{k:'desc',w:290,label:'البيان'},{k:'debit',w:200,label:'ثمن البيع',n:1},{k:'credit',w:200,label:'المدفوع',n:1},{k:'bal',w:200,label:'الباقي',n:1}];
   const mv=v=>'\u202A'+fmt(v)+'\u202C '+cur();
   let edge=R;cols.forEach(col=>{col.r=edge;col.l=edge-col.w;edge=col.l;});
   const START1=480,START2=150,BOTTOM=H-190;
@@ -987,9 +1008,78 @@ async function buildStatement(name,asImage){
   if(asImage){const png=await new Promise(res=>imageCanvas.toBlob(res,'image/png'));return previewAndSave([imageCanvas],fileBase(name)+'.png',png);}
   return previewAndSave(pages,fileBase(name)+'.pdf',new Blob([pdf.output('arraybuffer')]));
 }
-const exportPdf=n=>buildStatement(n,false),exportImage=n=>buildStatement(n,true);
+const exportImage=n=>buildStatement(n,true);
+/* ---------- remaining-debt invoice (image) ---------- */
+async function buildInvoice(name){
+  const c=customerList().find(x=>x.name===name);if(!c)return;
+  const biz=state.settings.biz,issued=today(),w=balanceWords(c.bal);
+  const byOld=(a,b)=>a.date<b.date?-1:a.date>b.date?1:(a.createdAt||0)-(b.createdAt||0);
+  const S=state.sales.filter(x=>x.customer===name).sort(byOld),P=state.payments.filter(x=>x.customer===name).sort(byOld);
+  const n=Math.max(S.length,P.length,1);
+  const W=1240,M=80,TW=W-2*M,R=W-M,RH=58,HH=66,TY=500;
+  const H=TY+HH+RH*n+HH+40+170+150;
+  const INK='#14282b',MUTED='#5a6f73',LINE='#d3dcda',ACC='#0e5c63',GOOD='#17754a',WHITE='#ffffff';
+  const font=(wt,s)=>wt+' '+s+'px "IBM Plex Sans Arabic", Tahoma, Arial, sans-serif';
+  const mv=v=>String.fromCharCode(0x202A)+fmt(v)+String.fromCharCode(0x202C)+' '+cur();
+  try{await Promise.all([400,600,700].map(k=>document.fonts.load(font(k,22),'فاتورة 123')));}catch(e){}
+  const cv=document.createElement('canvas');cv.width=W;cv.height=H;const x=cv.getContext('2d');
+  const ar=(t,px,py,f,color,align)=>{x.font=f;x.fillStyle=color||INK;x.direction='rtl';x.textAlign=align||'right';x.fillText(t,px,py);};
+  const fit=(t,f,maxW)=>{x.font=f;t=String(t);if(x.measureText(t).width<=maxW)return t;while(t.length>1&&x.measureText(t+'…').width>maxW)t=t.slice(0,-1);return t+'…';};
+  const line=(x1,y1,x2,y2,color,lw)=>{x.strokeStyle=color;x.lineWidth=lw||1;x.beginPath();x.moveTo(x1,y1);x.lineTo(x2,y2);x.stroke();};
+  x.fillStyle=WHITE;x.fillRect(0,0,W,H);
+  // header band
+  x.fillStyle=ACC;x.fillRect(0,0,W,250);
+  x.fillStyle='#f0b84a';x.fillRect(0,250,W,8);
+  if(biz){ar(fit(biz,font(600,30),TW-360),R,78,font(600,30),'#cfe6e7');ar('فاتورة',R,158,font(700,64),WHITE);ar('باقي الدين',R,212,font(500,30),'#cfe6e7');}
+  else{ar('فاتورة',R,130,font(700,68),WHITE);ar('باقي الدين',R,190,font(500,32),'#cfe6e7');}
+  ar('تاريخ الإصدار',M,118,font(400,22),'#cfe6e7','left');
+  ar(arDate(issued),M,160,font(600,30),WHITE,'left');
+  // customer
+  x.fillStyle='#f3f7f6';x.fillRect(M,300,TW,150);
+  x.fillStyle=ACC;x.fillRect(R-8,300,8,150);
+  ar('العميل',R-36,348,font(400,22),MUTED);
+  ar(fit(name,font(700,42),TW-420),R-36,408,font(700,42));
+  if(c.phone){ar('الهاتف',M+30,348,font(400,22),MUTED,'left');x.font=font(500,28);x.fillStyle=INK;x.direction='ltr';x.textAlign='left';x.fillText(c.phone,M+30,404);}
+  // table: purchases on the right half, payments on the left half
+  const CW=TW/4,col=i=>({r:R-i*CW,l:R-(i+1)*CW}),MID=R-2*CW;
+  let y=TY;
+  x.fillStyle='#deeded';x.fillRect(MID,y,2*CW,HH);
+  x.fillStyle='#e2f2e9';x.fillRect(M,y,2*CW,HH);
+  ['تاريخ الشراء','إجمالي المشتريات','تاريخ الدفع','إجمالي المدفوعات'].forEach((t,i)=>ar(t,col(i).r-22,y+42,font(600,23),i<2?ACC:GOOD));
+  y+=HH;
+  for(let i=0;i<n;i++){
+    if(i%2){x.fillStyle='#f7f9f9';x.fillRect(M,y,TW,RH);}
+    const s=S[i],p=P[i];
+    if(s){ar(arDate(s.date),col(0).r-22,y+38,font(400,23),MUTED);ar(mv(cents(s.amount)),col(1).r-22,y+38,font(500,24));}
+    if(p){ar(arDate(p.date),col(2).r-22,y+38,font(400,23),MUTED);ar(mv(cents(p.amount)),col(3).r-22,y+38,font(500,24),GOOD);}
+    if(!s&&!p)ar('لا توجد حركات',col(0).r-22,y+38,font(400,23),MUTED);
+    line(M,y+RH,R,y+RH,LINE,1);
+    y+=RH;
+  }
+  line(M,y,R,y,INK,2);
+  x.fillStyle='#deeded';x.fillRect(MID,y+1,2*CW,HH-1);
+  x.fillStyle='#e2f2e9';x.fillRect(M,y+1,2*CW,HH-1);
+  ar('الإجمالي',col(0).r-22,y+43,font(700,24));ar(mv(c.debit),col(1).r-22,y+43,font(700,25));
+  ar('الإجمالي',col(2).r-22,y+43,font(700,24),GOOD);ar(mv(c.credit),col(3).r-22,y+43,font(700,25),GOOD);
+  line(M,y+HH,R,y+HH,INK,2);
+  line(MID,TY,MID,y+HH,INK,2);
+  line(M,TY,M,y+HH,LINE,1);line(R,TY,R,y+HH,LINE,1);line(M,TY,R,TY,LINE,1);
+  y+=HH+40;
+  // remaining
+  x.fillStyle=ACC;x.fillRect(M,y,TW,170);
+  x.fillStyle='#f0b84a';x.fillRect(R-10,y,10,170);
+  if(c.bal===0){ar('الحساب مسدَّد بالكامل',R-44,y+104,font(700,46),WHITE);}
+  else{ar(w.label,R-44,y+72,font(600,32),'#cfe6e7');ar(mv(Math.abs(c.bal)),R-44,y+136,font(700,58),WHITE);}
+  y+=170;
+  line(M,H-96,R,H-96,LINE,1);
+  ar(fit((biz?biz+' · ':'')+'فاتورة '+name,font(400,20),TW-340),R,H-56,font(400,20),MUTED);
+  ar('صدر بتاريخ '+arDate(issued),M,H-56,font(400,20),MUTED,'left');
+  const png=await new Promise(res=>cv.toBlob(res,'image/png'));
+  return previewAndSave([cv],'فاتورة - '+safeName(name)+' - '+today()+'.png',png);
+}
+
 $('#exp-img').addEventListener('click',()=>{if(currentCustomer)exportImage(currentCustomer).catch(()=>toast('تعذّر إنشاء الصورة.',true));});
-$('#exp-pdf').addEventListener('click',()=>{if(currentCustomer)exportPdf(currentCustomer).catch(()=>toast('تعذّر إنشاء الكشف.',true));});
+$('#exp-debt').addEventListener('click',()=>{if(currentCustomer)buildInvoice(currentCustomer).catch(()=>toast('تعذّر إنشاء الفاتورة.',true));});
 
 showTab();renderAll();init();
 })();
