@@ -406,7 +406,7 @@ function init(){
   checkUpdate();
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')checkUpdate();});
 }
-const BUILD='2026-11-13 13:23';
+const BUILD='2026-11-13 13:29';
 async function checkUpdate(){
   try{
     const r=await fetch('version.txt?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;
@@ -462,7 +462,8 @@ const MONTHS=['يناير','فبراير','مارس','أبريل','مايو','ي
 const dparts=d=>{const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(d||''));return m&&MONTHS[+m[2]-1]?[String(+m[3]),MONTHS[+m[2]-1],m[1]]:null;};
 const arDate=d=>{const x=dparts(d);return x?x.join(' '):String(d||'');};
 const dt_old=d=>{const m=/^(\d{4}-)(.+)$/.exec(String(d||''));return m?'<span class="y">'+m[1]+'</span>'+esc(m[2]):esc(d);};
-const dt=d=>{const x=dparts(d);return x?esc(x[0]+' '+x[1])+'<span class="y"> '+x[2]+'</span>':esc(d);};
+const numDate=d=>{const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(d||''));return m?m[3]+'/'+m[2]+'/'+m[1]:String(d||'');};
+const dt=d=>'<bdi dir="ltr">'+esc(numDate(d))+'</bdi>';
 const delBtn=(col,id)=>'<button class="del" type="button" data-del="'+col+'" data-id="'+esc(id)+'">حذف</button>';
 function renderSales(){
   const q=norm($('#sales-q').value);
@@ -506,7 +507,7 @@ function renderDetail(c){
     '<div class="fig due"><div class="lbl">'+w.label+'</div><div class="val">'+money(Math.abs(c.bal))+'</div></div>';
   if(!rows.length){$('#d-ledger').innerHTML='<p class="empty">لا توجد حركات على هذا الحساب بعد.</p>';return;}
   $('#d-ledger').innerHTML='<table class="two"><thead><tr><th class="c-main">البيان</th><th class="num">مستحق</th><th class="num">مدفوع</th><th class="num">الباقي</th></tr></thead><tbody>'+
-    rows.map(r=>'<tr><td class="c-main"><span class="date">'+esc(arDate(r.date))+'</span>'+esc(r.desc)+' '+delBtn(r.col,r.id)+'</td>'+(r.debit?mc(r.debit):'<td></td>')+(r.credit?mc(r.credit,'credit'):'<td></td>')+mc(r.bal)+'</tr>').join('')+
+    rows.map(r=>'<tr><td class="c-main"><span class="date">'+dt(r.date)+'</span>'+esc(r.desc)+' '+delBtn(r.col,r.id)+'</td>'+(r.debit?mc(r.debit):'<td></td>')+(r.credit?mc(r.credit,'credit'):'<td></td>')+mc(r.bal)+'</tr>').join('')+
     '<tr class="total"><td class="c-main">الباقي</td><td></td><td></td>'+mc(c.bal,'',1)+'</tr></tbody></table>';
 }
 function labelCells(){
