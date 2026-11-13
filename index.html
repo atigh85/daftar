@@ -11,6 +11,17 @@
 <meta name="apple-mobile-web-app-title" content="دفتر التجارة">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 <link rel="icon" href="icons/icon-192.png">
+<meta name="description" content="مشتريات، مبيعات، وحسابات العملاء">
+<meta property="og:type" content="website">
+<meta property="og:title" content="دفتر التجارة">
+<meta property="og:description" content="مشتريات، مبيعات، وحسابات العملاء">
+<meta property="og:url" content="https://atigh85.github.io/daftar/">
+<meta property="og:image" content="https://atigh85.github.io/daftar/icons/icon-512.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="512">
+<meta property="og:image:height" content="512">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://atigh85.github.io/daftar/icons/icon-512.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Reem+Kufi:wght@600;700&display=swap" rel="stylesheet">
 <script src="lib/jspdf.umd.min.js" defer></script>
@@ -357,7 +368,7 @@ function init(){
   checkUpdate();
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')checkUpdate();});
 }
-const BUILD='2026-11-13 02:39';
+const BUILD='2026-11-13 05:37';
 async function checkUpdate(){
   try{
     const r=await fetch('version.txt?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;
