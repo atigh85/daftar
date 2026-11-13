@@ -128,7 +128,8 @@ table.led .meta{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;margi
 table.led .c-main{overflow-wrap:normal;word-break:normal}
 table.led .meta .date{display:inline;font-size:12px;white-space:nowrap}
 table.led .meta .del{margin:0;padding:1px 8px;font-size:12px;min-height:0}
-table.led tr.total td{background:var(--surface)}
+table.led tr.total td{background:var(--surface);font-size:16px}
+table.led tr.total td+td{border-inline-start:0}
 .c-main .date{display:block;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
 .c-main .del{margin-inline-start:8px}
 .c-main{overflow-wrap:anywhere}
@@ -419,7 +420,7 @@ function init(){
   checkUpdate();
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')checkUpdate();});
 }
-const BUILD='2026-11-13 22:29';
+const BUILD='2026-11-13 22:38';
 async function checkUpdate(){
   try{
     const r=await fetch('version.txt?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;
@@ -460,7 +461,7 @@ function ledger(name){
   return rows;
 }
 function balanceWords(bal){
-  if(bal>0)return{label:'الباقي على العميل',pill:'<span class="pill due">عليه باقٍ</span>'};
+  if(bal>0)return{label:'الباقي',pill:'<span class="pill due">عليه باقٍ</span>'};
   if(bal<0)return{label:'زائد للعميل',pill:'<span class="pill adv">له زائد</span>'};
   return{label:'الباقي',pill:'<span class="pill ok">مسدَّد</span>'};
 }
@@ -527,9 +528,9 @@ function renderDetail(c){
     '<div class="fig"><div class="lbl">إجمالي المدفوعات</div><div class="val credit">'+money(c.credit)+'</div></div>'+
     '<div class="fig due"><div class="lbl">'+w.label+'</div><div class="val">'+money(Math.abs(c.bal))+'</div></div>';
   if(!rows.length){$('#d-ledger').innerHTML='<p class="empty">لا توجد حركات على هذا الحساب بعد.</p>';return;}
-  $('#d-ledger').innerHTML='<table class="led"><thead><tr><th>البيان</th><th class="num">ثمن البيع</th><th class="num">المدفوع</th><th class="num">الباقي</th></tr></thead><tbody>'+
-    rows.map(r=>'<tr class="'+(r.credit?'pay':'sale')+'"><td class="c-main"><span class="what">'+esc(r.desc)+'</span><span class="meta"><span class="date">'+dt(r.date)+'</span>'+delBtn(r.col,r.id)+'</span></td>'+(r.debit?mc(r.debit):'<td></td>')+(r.credit?mc(r.credit,'credit'):'<td></td>')+mc(r.bal,'',1)+'</tr>').join('')+
-    '<tr class="total"><td colspan="3">'+w.label+'</td>'+mc(Math.abs(c.bal),'',1)+'</tr></tbody></table>';
+  $('#d-ledger').innerHTML='<table class="led"><thead><tr><th>التاريخ</th><th>البيان</th><th class="num">ثمن البيع</th><th class="num">المدفوع</th></tr></thead><tbody>'+
+    rows.map(r=>'<tr class="'+(r.credit?'pay':'sale')+'"><td class="date">'+dt(r.date)+'</td><td class="c-main"><span class="what">'+esc(r.desc)+'</span><span class="meta">'+delBtn(r.col,r.id)+'</span></td>'+(r.debit?mc(r.debit):'<td></td>')+(r.credit?mc(r.credit,'credit'):'<td></td>')+'</tr>').join('')+
+    '<tr class="total"><td colspan="2">'+w.label+'</td><td colspan="2" class="mny"><span><strong><bdi dir="ltr">'+fmt(Math.abs(c.bal))+'</bdi></strong> <small>'+esc(cur())+'</small></span></td></tr></tbody></table>';
 }
 function labelCells(){
   document.querySelectorAll('.scroll table').forEach(t=>{
@@ -931,14 +932,14 @@ async function buildStatement(name,asImage){
   if(!asImage&&!window.jspdf){toast('تعذّر تحميل أداة PDF. تحقق من الاتصال وأعد المحاولة.',true);return;}
   const c=customerList().find(x=>x.name===name),w=balanceWords(c.bal),biz=state.settings.biz,issued=today();
   const rows=ledger(name).concat([{total:true}]);
-  const W=1240,M=80,RH=46,TW=W-2*M,R=W-M,H=asImage?480+(rows.length+1)*RH+190:1754;
+  const W=1240,M=80,RH=46,TW=W-2*M,R=W-M,PADB=asImage?80:190,H=asImage?480+(rows.length+1)*RH+PADB:1754;
   const INK='#14282b',MUTED='#5a6f73',LINE='#d3dcda',ACC='#0e5c63',GOOD='#17754a';
   const font=(wt,s)=>wt+' '+s+'px "IBM Plex Sans Arabic", Tahoma, Arial, sans-serif';
   try{await Promise.all([400,600,700].map(x=>document.fonts.load(font(x,22),'كشف حساب 123')));}catch(e){}
-  const cols=[{k:'date',w:190,label:'التاريخ'},{k:'desc',w:290,label:'البيان'},{k:'debit',w:200,label:'ثمن البيع',n:1},{k:'credit',w:200,label:'المدفوع',n:1},{k:'bal',w:200,label:'الباقي',n:1}];
+  const cols=[{k:'date',w:190,label:'التاريخ'},{k:'desc',w:430,label:'البيان'},{k:'debit',w:230,label:'ثمن البيع',n:1},{k:'credit',w:230,label:'المدفوع',n:1}];
   const mv=v=>'\u202A'+fmt(v)+'\u202C '+cur();
   let edge=R;cols.forEach(col=>{col.r=edge;col.l=edge-col.w;edge=col.l;});
-  const START1=480,START2=150,BOTTOM=H-190;
+  const START1=480,START2=150,BOTTOM=H-PADB;
   const cap1=Math.floor((BOTTOM-START1)/RH)-1,cap2=Math.floor((BOTTOM-START2)/RH)-1;
   const chunks=[rows.slice(0,cap1)];
   for(let i=cap1;i<rows.length;i+=cap2)chunks.push(rows.slice(i,i+cap2));
@@ -962,7 +963,7 @@ async function buildStatement(name,asImage){
       ar('العميل',R,250,font(400,22),MUTED);
       ar(fit(name,font(700,34),TW-360),R,296,font(700,34));
       if(c.phone){ar('الهاتف',M,250,font(400,22),MUTED,'left');nm(c.phone,M,292,font(500,26));}
-      const boxes=[['إجمالي المستحقات',c.debit,INK],['إجمالي المدفوعات',c.credit,GOOD],[w.label,Math.abs(c.bal),ACC]];
+      const boxes=[['إجمالي المستحقات (الدين)',c.debit,INK],['إجمالي المدفوعات',c.credit,GOOD],[w.label,Math.abs(c.bal),ACC]];
       const bw=(TW-40)/3;
       boxes.forEach((b,i)=>{
         const br=R-i*(bw+20),bl=br-bw;
@@ -981,11 +982,10 @@ async function buildStatement(name,asImage){
     chunk.forEach((r,i)=>{
       if(r.total){
         hline(y,INK,2);
-        ar('الباقي',cols[1].r-14,y+31,font(700,22));
-        ar(mv(c.bal),cols[4].l+14,y+31,font(700,21),INK,'left');
-        hline(y+RH-5,INK,1.5);hline(y+RH,INK,1.5);
-        const line=c.bal>0?'الباقي على العميل حتى تاريخ الإصدار':c.bal<0?'زائد للعميل حتى تاريخ الإصدار':'الحساب مسدَّد بالكامل حتى تاريخ الإصدار';
-        ar(line+(c.bal?':  '+fmt(Math.abs(c.bal))+' '+cur():''),R,y+RH+58,font(700,26),ACC);
+        x.fillStyle='#deeded';x.fillRect(M,y+1,TW,RH+8);
+        ar(w.label,cols[0].r-14,y+37,font(700,26));
+        ar(mv(Math.abs(c.bal)),M+14,y+37,font(700,28),ACC,'left');
+        hline(y+RH+9,INK,1.5);hline(y+RH+14,INK,1.5);
         y+=RH;return;
       }
       if(i%2){x.fillStyle='#f5f8f7';x.fillRect(M,y,TW,RH);}
@@ -993,10 +993,10 @@ async function buildStatement(name,asImage){
       ar(fit(r.desc,font(400,21),cols[1].w-28),cols[1].r-14,y+30,font(400,21));
       if(r.debit)ar(mv(r.debit),cols[2].l+14,y+30,font(400,21),INK,'left');
       if(r.credit)ar(mv(r.credit),cols[3].l+14,y+30,font(400,21),GOOD,'left');
-      ar(mv(r.bal),cols[4].l+14,y+30,font(500,21),INK,'left');
       hline(y+RH,LINE,1);
       y+=RH;
     });
+    if(asImage){imageCanvas=cv;return;}
     hline(H-100,LINE,1);
     ar(fit((biz?biz+' · ':'')+'كشف حساب '+name,font(400,18),TW-220),R,H-64,font(400,18),MUTED);
     if(asImage){ar('صدر بتاريخ '+arDate(issued),M,H-64,font(400,18),MUTED,'left');imageCanvas=cv;return;}
