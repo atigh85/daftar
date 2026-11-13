@@ -120,16 +120,12 @@ td.date{white-space:nowrap;font-variant-numeric:tabular-nums;color:var(--muted)}
 tr.total td{border-top:1px solid var(--ink);border-bottom:3px double var(--ink);font-weight:700}
 .credit{color:var(--good)}
 table.led{min-width:0}
-table.led th,table.led td{vertical-align:middle}
-table.led th+th,table.led td+td{border-inline-start:1px solid var(--line)}
-table.led tbody tr.pay td{background:var(--good-soft)}
-table.led .what{display:block;font-weight:600}
+table.led .what{display:block}
 table.led .meta{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;margin-top:3px}
 table.led .c-main{overflow-wrap:normal;word-break:normal}
 table.led .meta .date{display:inline;font-size:12px;white-space:nowrap}
 table.led .meta .del{margin:0;padding:1px 8px;font-size:12px;min-height:0}
-table.led tr.total td{background:var(--surface);font-size:16px}
-table.led tr.total td+td{border-inline-start:0}
+
 .c-main .date{display:block;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
 .c-main .del{margin-inline-start:8px}
 .c-main{overflow-wrap:anywhere}
@@ -178,10 +174,6 @@ dialog h2{margin:0;font-size:18px}
   .date .y{display:none}
   .mny small{font-size:11px}
   .del{padding:2px 7px;font-size:12px}
-  table.led{font-size:12px}
-  table.led th,table.led td{padding:8px 4px}
-  table.led .meta .date{font-size:11px}
-  table.led .mny small{font-size:9px}
   /* wide registers: name/description on one line, the three amounts on the line below */
   table.two,table.two thead,table.two tbody{display:block}
   table.two tr{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));column-gap:6px;padding:7px 0;border-bottom:1px solid var(--line)}
@@ -420,7 +412,7 @@ function init(){
   checkUpdate();
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')checkUpdate();});
 }
-const BUILD='2026-11-13 22:42';
+const BUILD='2026-11-13 22:44';
 async function checkUpdate(){
   try{
     const r=await fetch('version.txt?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;
