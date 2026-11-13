@@ -149,6 +149,14 @@ dialog h2{margin:0;font-size:18px}
   .fig .val{font-size:19px}
   form.entry .wide{grid-column:auto}
   .three{grid-template-columns:1fr}
+  /* pop-up windows fill the phone screen; actions stay at the bottom */
+  #settings,#pv{width:100vw;max-width:100vw;height:100vh;height:100dvh;max-height:100vh;max-height:100dvh;margin:0;inset:0;border:0;border-radius:0;padding:16px}
+  #settings[open],#pv[open]{display:flex;flex-direction:column}
+  #settings form{flex:1;min-height:0;overflow:auto}
+  #settings form>.actions:last-child{margin-top:auto;position:sticky;bottom:0;background:var(--surface);padding-top:10px}
+  #pv-body{flex:1;min-height:0;max-height:none}
+  #pv .actions .btn,#settings form>.actions:last-child .btn{flex:1;min-height:46px}
+  input,select{font-size:16px}
   table{min-width:0;font-size:13px}
   th{font-size:12px;white-space:normal}
   th,td{padding:7px 4px}
@@ -394,7 +402,7 @@ function init(){
   checkUpdate();
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')checkUpdate();});
 }
-const BUILD='2026-11-13 12:40';
+const BUILD='2026-11-13 12:52';
 async function checkUpdate(){
   try{
     const r=await fetch('version.txt?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;
