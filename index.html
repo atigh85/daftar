@@ -406,7 +406,7 @@ function init(){
   checkUpdate();
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')checkUpdate();});
 }
-const BUILD='2026-11-13 13:29';
+const BUILD='2026-11-13 13:33';
 async function checkUpdate(){
   try{
     const r=await fetch('version.txt?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;
@@ -462,7 +462,7 @@ const MONTHS=['يناير','فبراير','مارس','أبريل','مايو','ي
 const dparts=d=>{const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(d||''));return m&&MONTHS[+m[2]-1]?[String(+m[3]),MONTHS[+m[2]-1],m[1]]:null;};
 const arDate=d=>{const x=dparts(d);return x?x.join(' '):String(d||'');};
 const dt_old=d=>{const m=/^(\d{4}-)(.+)$/.exec(String(d||''));return m?'<span class="y">'+m[1]+'</span>'+esc(m[2]):esc(d);};
-const numDate=d=>{const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(d||''));return m?m[3]+'/'+m[2]+'/'+m[1]:String(d||'');};
+const numDate=d=>{const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(d||''));return m?m[1]+'/'+m[2]+'/'+m[3]:String(d||'');};
 const dt=d=>'<bdi dir="ltr">'+esc(numDate(d))+'</bdi>';
 const delBtn=(col,id)=>'<button class="del" type="button" data-del="'+col+'" data-id="'+esc(id)+'">حذف</button>';
 function renderSales(){
