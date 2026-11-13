@@ -419,7 +419,7 @@ function init(){
   checkUpdate();
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')checkUpdate();});
 }
-const BUILD='2026-11-13 22:27';
+const BUILD='2026-11-13 22:29';
 async function checkUpdate(){
   try{
     const r=await fetch('version.txt?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;
@@ -1069,7 +1069,7 @@ async function buildInvoice(name){
   x.fillStyle=ACC;x.fillRect(M,y,TW,170);
   x.fillStyle='#f0b84a';x.fillRect(R-10,y,10,170);
   if(c.bal===0){ar('الحساب مسدَّد بالكامل',R-44,y+104,font(700,46),WHITE);}
-  else{ar(w.label,R-44,y+72,font(600,32),'#cfe6e7');ar(mv(Math.abs(c.bal)),R-44,y+136,font(700,58),WHITE);}
+  else{ar(c.bal>0?'الباقي':w.label,R-44,y+72,font(600,32),'#cfe6e7');ar(mv(Math.abs(c.bal)),R-44,y+136,font(700,58),WHITE);}
   y+=170;
   const png=await new Promise(res=>cv.toBlob(res,'image/png'));
   return previewAndSave([cv],'فاتورة - '+safeName(name)+' - '+today()+'.png',png);

@@ -1,4 +1,4 @@
-const CACHE = 'daftar-v20';
+const CACHE = 'daftar-v21';
 const FILES = ['./', 'index.html', 'manifest.webmanifest',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-180.png', 'icons/icon-maskable-512.png'];
 self.addEventListener('install', e => {
