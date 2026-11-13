@@ -100,6 +100,10 @@ form.entry .wide{grid-column:span 2}
 label.f{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted);min-width:0}
 input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:9px 10px;width:100%;min-width:0}
 input[type="date"]{-webkit-appearance:none;appearance:none;display:block;min-height:44px;text-align:start}
+.datewrap{position:relative;display:block}
+.datetxt{display:flex;align-items:center;min-height:44px;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);white-space:nowrap}
+.datewrap input{position:absolute;inset:0;width:100%;height:100%;min-height:0;opacity:0;cursor:pointer}
+.datewrap:focus-within .datetxt{outline:2px solid var(--accent);outline-offset:2px}
 input.amt{direction:ltr;text-align:right;font-variant-numeric:tabular-nums}
 .bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:10px}
 .bar h2{margin:0}
@@ -402,7 +406,7 @@ function init(){
   checkUpdate();
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')checkUpdate();});
 }
-const BUILD='2026-11-13 12:52';
+const BUILD='2026-11-13 13:23';
 async function checkUpdate(){
   try{
     const r=await fetch('version.txt?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;
@@ -454,7 +458,11 @@ function renderSummary(){
   $('#biz-name').textContent=state.settings.biz||'مشتريات، مبيعات، وحسابات العملاء';
 }
 const mc=(c,cls,strong)=>'<td class="mny'+(cls?' '+cls:'')+'">'+'<span>'+(strong?'<strong>':'')+'<bdi dir="ltr">'+fmt(c)+'</bdi>'+(strong?'</strong>':'')+' <small>'+esc(cur())+'</small></span></td>';
-const dt=d=>{const m=/^(\d{4}-)(.+)$/.exec(String(d||''));return m?'<span class="y">'+m[1]+'</span>'+esc(m[2]):esc(d);};
+const MONTHS=['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+const dparts=d=>{const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(d||''));return m&&MONTHS[+m[2]-1]?[String(+m[3]),MONTHS[+m[2]-1],m[1]]:null;};
+const arDate=d=>{const x=dparts(d);return x?x.join(' '):String(d||'');};
+const dt_old=d=>{const m=/^(\d{4}-)(.+)$/.exec(String(d||''));return m?'<span class="y">'+m[1]+'</span>'+esc(m[2]):esc(d);};
+const dt=d=>{const x=dparts(d);return x?esc(x[0]+' '+x[1])+'<span class="y"> '+x[2]+'</span>':esc(d);};
 const delBtn=(col,id)=>'<button class="del" type="button" data-del="'+col+'" data-id="'+esc(id)+'">حذف</button>';
 function renderSales(){
   const q=norm($('#sales-q').value);
@@ -498,7 +506,7 @@ function renderDetail(c){
     '<div class="fig due"><div class="lbl">'+w.label+'</div><div class="val">'+money(Math.abs(c.bal))+'</div></div>';
   if(!rows.length){$('#d-ledger').innerHTML='<p class="empty">لا توجد حركات على هذا الحساب بعد.</p>';return;}
   $('#d-ledger').innerHTML='<table class="two"><thead><tr><th class="c-main">البيان</th><th class="num">مستحق</th><th class="num">مدفوع</th><th class="num">الباقي</th></tr></thead><tbody>'+
-    rows.map(r=>'<tr><td class="c-main"><span class="date">'+esc(r.date)+'</span>'+esc(r.desc)+' '+delBtn(r.col,r.id)+'</td>'+(r.debit?mc(r.debit):'<td></td>')+(r.credit?mc(r.credit,'credit'):'<td></td>')+mc(r.bal)+'</tr>').join('')+
+    rows.map(r=>'<tr><td class="c-main"><span class="date">'+esc(arDate(r.date))+'</span>'+esc(r.desc)+' '+delBtn(r.col,r.id)+'</td>'+(r.debit?mc(r.debit):'<td></td>')+(r.credit?mc(r.credit,'credit'):'<td></td>')+mc(r.bal)+'</tr>').join('')+
     '<tr class="total"><td class="c-main">الباقي</td><td></td><td></td>'+mc(c.bal,'',1)+'</tr></tbody></table>';
 }
 function labelCells(){
@@ -533,7 +541,17 @@ function guard(){if(!ready){toast('لحظة، جارٍ تجهيز الحفظ…'
 function saveFailed(e){toast(e&&e.code==='quota_exceeded'?'امتلأت مساحة البيانات. احذف سجلات قديمة ثم أعد المحاولة.':'تعذّر الحفظ. قد لا تملك صلاحية التعديل على هذه الصفحة.',true);}
 
 /* ---------- forms ---------- */
-['#s-date','#p-date','#y-date'].forEach(s=>{$(s).value=today();});
+['#s-date','#p-date','#y-date'].forEach(sel=>{
+  const inp=$(sel),w=document.createElement('span'),lab=document.createElement('span');
+  inp.value=today();
+  w.className='datewrap';lab.className='datetxt';
+  inp.parentNode.insertBefore(w,inp);w.appendChild(lab);w.appendChild(inp);
+  inp._up=()=>{lab.textContent=inp.value?arDate(inp.value):'اختر التاريخ';};
+  inp.addEventListener('input',inp._up);inp.addEventListener('change',inp._up);
+  inp.addEventListener('click',()=>{try{if(inp.showPicker)inp.showPicker();}catch(e){}});
+  inp._up();
+});
+const refreshDates=()=>document.querySelectorAll('.datewrap input').forEach(i=>i._up());
 
 $('#f-sale').addEventListener('submit',async e=>{
   e.preventDefault();if(!guard())return;
@@ -758,6 +776,7 @@ function runCommand(text){
     $('#y-date').value=r.date;$('#y-desc').value=r.desc;$('#y-amt').value=String(r.amount);
     reveal('#f-pay');toast('راجع البيانات ثم اضغط «إضافة الدفعة».');
   }
+  refreshDates();
   return true;
 }
 $('#f-cmd').addEventListener('submit',e=>{e.preventDefault();const el=$('#cmd');if(runCommand(el.value)){el.value='';el.blur();}else el.focus();});
@@ -814,7 +833,7 @@ function dailySnapshot(){
 }
 function renderSnaps(){
   const a=getSnaps().slice().reverse();
-  $('#snap-sel').innerHTML=a.length?a.map(x=>'<option value="'+esc(x.day)+'">بداية يوم '+esc(x.day)+'</option>').join(''):'<option value="">لا توجد نسخ يومية بعد</option>';
+  $('#snap-sel').innerHTML=a.length?a.map(x=>'<option value="'+esc(x.day)+'">بداية يوم '+esc(arDate(x.day))+'</option>').join(''):'<option value="">لا توجد نسخ يومية بعد</option>';
   $('#snap-load').disabled=!a.length;
 }
 function bannerCheck(){
@@ -836,10 +855,10 @@ let snapArmed=null;
 $('#snap-load').addEventListener('click',()=>{
   const b=$('#snap-load'),day=$('#snap-sel').value,sn=getSnaps().find(x=>x.day===day);
   if(!sn)return;
-  if(snapArmed!==day){snapArmed=day;b.textContent='تأكيد: استبدال البيانات الحالية بنسخة '+day;b.classList.add('armed');
+  if(snapArmed!==day){snapArmed=day;b.textContent='تأكيد: استبدال البيانات الحالية بنسخة '+arDate(day);b.classList.add('armed');
     setTimeout(()=>{if(snapArmed===day){snapArmed=null;b.textContent='استرجاع هذه النسخة';b.classList.remove('armed');}},8000);return;}
   snapArmed=null;b.textContent='استرجاع هذه النسخة';b.classList.remove('armed');
-  try{loadData(JSON.parse(sn.data));currentCustomer=null;persist();renderAll();dlg.close();toast('استُرجعت بيانات بداية يوم '+day);}
+  try{loadData(JSON.parse(sn.data));currentCustomer=null;persist();renderAll();dlg.close();toast('استُرجعت بيانات بداية يوم '+arDate(day));}
   catch(e){toast('تعذّر استرجاع هذه النسخة.',true);}
 });
 let pendingBackup=null;
@@ -894,7 +913,7 @@ async function buildStatement(name,asImage){
   const INK='#14282b',MUTED='#5a6f73',LINE='#d3dcda',ACC='#0e5c63',GOOD='#17754a';
   const font=(wt,s)=>wt+' '+s+'px "IBM Plex Sans Arabic", Tahoma, Arial, sans-serif';
   try{await Promise.all([400,600,700].map(x=>document.fonts.load(font(x,22),'كشف حساب 123')));}catch(e){}
-  const cols=[{k:'date',w:150,label:'التاريخ'},{k:'desc',w:330,label:'البيان'},{k:'debit',w:200,label:'مستحق',n:1},{k:'credit',w:200,label:'مدفوع',n:1},{k:'bal',w:200,label:'الباقي',n:1}];
+  const cols=[{k:'date',w:190,label:'التاريخ'},{k:'desc',w:290,label:'البيان'},{k:'debit',w:200,label:'مستحق',n:1},{k:'credit',w:200,label:'مدفوع',n:1},{k:'bal',w:200,label:'الباقي',n:1}];
   const mv=v=>'\u202A'+fmt(v)+'\u202C '+cur();
   let edge=R;cols.forEach(col=>{col.r=edge;col.l=edge-col.w;edge=col.l;});
   const START1=480,START2=150,BOTTOM=H-190;
@@ -916,7 +935,7 @@ async function buildStatement(name,asImage){
       ar(fit(biz||'كشف حساب',font(700,44),TW-340),R,120,font(700,44),ACC);
       if(biz)ar('كشف حساب',R,172,font(500,28),MUTED);
       ar('تاريخ الإصدار',M,100,font(400,20),MUTED,'left');
-      nm(issued,M,134,font(600,26));
+      ar(arDate(issued),M,134,font(600,26),INK,'left');
       hline(205,LINE,2);
       ar('العميل',R,250,font(400,22),MUTED);
       ar(fit(name,font(700,34),TW-360),R,296,font(700,34));
@@ -948,7 +967,7 @@ async function buildStatement(name,asImage){
         y+=RH;return;
       }
       if(i%2){x.fillStyle='#f5f8f7';x.fillRect(M,y,TW,RH);}
-      ar(r.date,cols[0].r-14,y+30,font(400,20),MUTED);
+      ar(arDate(r.date),cols[0].r-14,y+30,font(400,20),MUTED);
       ar(fit(r.desc,font(400,21),cols[1].w-28),cols[1].r-14,y+30,font(400,21));
       if(r.debit)ar(mv(r.debit),cols[2].l+14,y+30,font(400,21),INK,'left');
       if(r.credit)ar(mv(r.credit),cols[3].l+14,y+30,font(400,21),GOOD,'left');
@@ -958,7 +977,7 @@ async function buildStatement(name,asImage){
     });
     hline(H-100,LINE,1);
     ar(fit((biz?biz+' · ':'')+'كشف حساب '+name,font(400,18),TW-220),R,H-64,font(400,18),MUTED);
-    if(asImage){ar('صدر بتاريخ \u202A'+issued+'\u202C',M,H-64,font(400,18),MUTED,'left');imageCanvas=cv;return;}
+    if(asImage){ar('صدر بتاريخ '+arDate(issued),M,H-64,font(400,18),MUTED,'left');imageCanvas=cv;return;}
     ar('صفحة '+(pi+1)+' من '+chunks.length,M,H-64,font(400,18),MUTED,'left');
     pages.push(cv);
     if(pi)pdf.addPage();
