@@ -420,7 +420,7 @@ function init(){
   checkUpdate();
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')checkUpdate();});
 }
-const BUILD='2026-11-13 22:38';
+const BUILD='2026-11-13 22:42';
 async function checkUpdate(){
   try{
     const r=await fetch('version.txt?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;
@@ -928,87 +928,72 @@ async function saveFile(filename,blob,mime){
   setTimeout(()=>URL.revokeObjectURL(url),60000);
   toast('تم تنزيل الملف');
 }
-async function buildStatement(name,asImage){
-  if(!asImage&&!window.jspdf){toast('تعذّر تحميل أداة PDF. تحقق من الاتصال وأعد المحاولة.',true);return;}
-  const c=customerList().find(x=>x.name===name),w=balanceWords(c.bal),biz=state.settings.biz,issued=today();
-  const rows=ledger(name).concat([{total:true}]);
-  const W=1240,M=80,RH=46,TW=W-2*M,R=W-M,PADB=asImage?80:190,H=asImage?480+(rows.length+1)*RH+PADB:1754;
-  const INK='#14282b',MUTED='#5a6f73',LINE='#d3dcda',ACC='#0e5c63',GOOD='#17754a';
+async function buildStatement(name){
+  const c=customerList().find(x=>x.name===name);if(!c)return;
+  const biz=state.settings.biz,issued=today(),w=balanceWords(c.bal),rows=ledger(name),n=Math.max(rows.length,1);
+  const W=1240,M=80,TW=W-2*M,R=W-M,RH=58,HH=66,TY=640;
+  const H=TY+HH+RH*n+40+170+70;
+  const INK='#14282b',MUTED='#5a6f73',LINE='#d3dcda',ACC='#0e5c63',GOOD='#17754a',WHITE='#ffffff';
   const font=(wt,s)=>wt+' '+s+'px "IBM Plex Sans Arabic", Tahoma, Arial, sans-serif';
-  try{await Promise.all([400,600,700].map(x=>document.fonts.load(font(x,22),'كشف حساب 123')));}catch(e){}
-  const cols=[{k:'date',w:190,label:'التاريخ'},{k:'desc',w:430,label:'البيان'},{k:'debit',w:230,label:'ثمن البيع',n:1},{k:'credit',w:230,label:'المدفوع',n:1}];
-  const mv=v=>'\u202A'+fmt(v)+'\u202C '+cur();
-  let edge=R;cols.forEach(col=>{col.r=edge;col.l=edge-col.w;edge=col.l;});
-  const START1=480,START2=150,BOTTOM=H-PADB;
-  const cap1=Math.floor((BOTTOM-START1)/RH)-1,cap2=Math.floor((BOTTOM-START2)/RH)-1;
-  const chunks=[rows.slice(0,cap1)];
-  for(let i=cap1;i<rows.length;i+=cap2)chunks.push(rows.slice(i,i+cap2));
-  const pdf=asImage?null:new window.jspdf.jsPDF({unit:'pt',format:'a4',compress:true});
-  let imageCanvas=null;const pages=[];
-  chunks.forEach((chunk,pi)=>{
-    const cv=document.createElement('canvas');cv.width=W;cv.height=H;const x=cv.getContext('2d');
-    const ar=(t,px,py,f,color,align)=>{x.font=f;x.fillStyle=color||INK;x.direction='rtl';x.textAlign=align||'right';x.fillText(t,px,py);};
-    const nm=(t,px,py,f,color)=>{x.font=f;x.fillStyle=color||INK;x.direction='ltr';x.textAlign='left';x.fillText(t,px,py);};
-    const fit=(t,f,maxW)=>{x.font=f;t=String(t);if(x.measureText(t).width<=maxW)return t;while(t.length>1&&x.measureText(t+'…').width>maxW)t=t.slice(0,-1);return t+'…';};
-    const hline=(y,color,lw)=>{x.strokeStyle=color;x.lineWidth=lw||1;x.beginPath();x.moveTo(M,y);x.lineTo(R,y);x.stroke();};
-    x.fillStyle='#ffffff';x.fillRect(0,0,W,H);
-    let y;
-    if(pi===0){
-      x.fillStyle=ACC;x.fillRect(0,0,W,18);
-      ar(fit(biz||'كشف حساب',font(700,44),TW-340),R,120,font(700,44),ACC);
-      if(biz)ar('كشف حساب',R,172,font(500,28),MUTED);
-      ar('تاريخ الإصدار',M,100,font(400,20),MUTED,'left');
-      ar(arDate(issued),M,134,font(600,26),INK,'left');
-      hline(205,LINE,2);
-      ar('العميل',R,250,font(400,22),MUTED);
-      ar(fit(name,font(700,34),TW-360),R,296,font(700,34));
-      if(c.phone){ar('الهاتف',M,250,font(400,22),MUTED,'left');nm(c.phone,M,292,font(500,26));}
-      const boxes=[['إجمالي المستحقات (الدين)',c.debit,INK],['إجمالي المدفوعات',c.credit,GOOD],[w.label,Math.abs(c.bal),ACC]];
-      const bw=(TW-40)/3;
-      boxes.forEach((b,i)=>{
-        const br=R-i*(bw+20),bl=br-bw;
-        x.strokeStyle=i===2?ACC:LINE;x.lineWidth=i===2?3:2;x.strokeRect(bl,330,bw,110);
-        ar(b[0],br-18,368,font(400,20),MUTED);
-        ar(fmt(b[1])+' '+cur(),br-18,416,font(700,30),b[2]);
-      });
-      y=START1;
-    }else{
-      ar(fit('كشف حساب: '+name,font(600,26),TW),R,100,font(600,26));
-      y=START2;
-    }
-    x.fillStyle='#deeded';x.fillRect(M,y,TW,RH);
-    cols.forEach(col=>{if(col.n)ar(col.label,col.l+14,y+30,font(600,19),INK,'left');else ar(col.label,col.r-14,y+30,font(600,19),INK);});
-    y+=RH;
-    chunk.forEach((r,i)=>{
-      if(r.total){
-        hline(y,INK,2);
-        x.fillStyle='#deeded';x.fillRect(M,y+1,TW,RH+8);
-        ar(w.label,cols[0].r-14,y+37,font(700,26));
-        ar(mv(Math.abs(c.bal)),M+14,y+37,font(700,28),ACC,'left');
-        hline(y+RH+9,INK,1.5);hline(y+RH+14,INK,1.5);
-        y+=RH;return;
-      }
-      if(i%2){x.fillStyle='#f5f8f7';x.fillRect(M,y,TW,RH);}
-      ar(arDate(r.date),cols[0].r-14,y+30,font(400,20),MUTED);
-      ar(fit(r.desc,font(400,21),cols[1].w-28),cols[1].r-14,y+30,font(400,21));
-      if(r.debit)ar(mv(r.debit),cols[2].l+14,y+30,font(400,21),INK,'left');
-      if(r.credit)ar(mv(r.credit),cols[3].l+14,y+30,font(400,21),GOOD,'left');
-      hline(y+RH,LINE,1);
-      y+=RH;
-    });
-    if(asImage){imageCanvas=cv;return;}
-    hline(H-100,LINE,1);
-    ar(fit((biz?biz+' · ':'')+'كشف حساب '+name,font(400,18),TW-220),R,H-64,font(400,18),MUTED);
-    if(asImage){ar('صدر بتاريخ '+arDate(issued),M,H-64,font(400,18),MUTED,'left');imageCanvas=cv;return;}
-    ar('صفحة '+(pi+1)+' من '+chunks.length,M,H-64,font(400,18),MUTED,'left');
-    pages.push(cv);
-    if(pi)pdf.addPage();
-    pdf.addImage(cv.toDataURL('image/jpeg',0.92),'JPEG',0,0,595.28,841.89);
+  const mv=v=>String.fromCharCode(0x202A)+fmt(v)+String.fromCharCode(0x202C)+' '+cur();
+  try{await Promise.all([400,600,700].map(k=>document.fonts.load(font(k,22),'كشف حساب 123')));}catch(e){}
+  const cv=document.createElement('canvas');cv.width=W;cv.height=H;const x=cv.getContext('2d');
+  const ar=(t,px,py,f,color,align)=>{x.font=f;x.fillStyle=color||INK;x.direction='rtl';x.textAlign=align||'right';x.fillText(t,px,py);};
+  const fit=(t,f,maxW)=>{x.font=f;t=String(t);if(x.measureText(t).width<=maxW)return t;while(t.length>1&&x.measureText(t+'…').width>maxW)t=t.slice(0,-1);return t+'…';};
+  const line=(x1,y1,x2,y2,color,lw)=>{x.strokeStyle=color;x.lineWidth=lw||1;x.beginPath();x.moveTo(x1,y1);x.lineTo(x2,y2);x.stroke();};
+  x.fillStyle=WHITE;x.fillRect(0,0,W,H);
+  // header band
+  x.fillStyle=ACC;x.fillRect(0,0,W,250);
+  x.fillStyle='#f0b84a';x.fillRect(0,250,W,8);
+  if(biz){ar(fit(biz,font(600,30),TW-360),R,84,font(600,30),'#cfe6e7');ar('كشف حساب',R,178,font(700,72),WHITE);}
+  else ar('كشف حساب',R,156,font(700,80),WHITE);
+  ar('تاريخ الإصدار',M,118,font(400,22),'#cfe6e7','left');
+  ar(arDate(issued),M,160,font(600,30),WHITE,'left');
+  // customer
+  x.fillStyle='#f3f7f6';x.fillRect(M,300,TW,150);
+  x.fillStyle=ACC;x.fillRect(R-8,300,8,150);
+  ar('العميل',R-36,350,font(700,30),MUTED);
+  ar(fit(name,font(700,54),TW-420),R-36,420,font(700,54));
+  if(c.phone){ar('الهاتف',M+30,348,font(400,22),MUTED,'left');x.font=font(500,28);x.fillStyle=INK;x.direction='ltr';x.textAlign='left';x.fillText(c.phone,M+30,404);}
+  // two totals
+  const BW=(TW-24)/2;
+  [['إجمالي المستحقات (الدين)',c.debit,ACC,'#deeded'],['إجمالي المدفوعات',c.credit,GOOD,'#e2f2e9']].forEach((b,i)=>{
+    const br=R-i*(BW+24),bl=br-BW;
+    x.fillStyle=b[3];x.fillRect(bl,480,BW,120);
+    ar(b[0],br-28,524,font(500,24),b[2]);
+    ar(mv(b[1]),br-28,576,font(700,36),b[2]);
   });
-  if(asImage){const png=await new Promise(res=>imageCanvas.toBlob(res,'image/png'));return previewAndSave([imageCanvas],fileBase(name)+'.png',png);}
-  return previewAndSave(pages,fileBase(name)+'.pdf',new Blob([pdf.output('arraybuffer')]));
+  // table
+  const cols=[{w:220,label:'التاريخ'},{w:400,label:'البيان'},{w:230,label:'ثمن البيع'},{w:230,label:'المدفوع'}];
+  let edge=R;cols.forEach(k=>{k.r=edge;k.l=edge-k.w;edge=k.l;});
+  let y=TY;
+  x.fillStyle='#deeded';x.fillRect(cols[2].l,y,cols[0].w+cols[1].w+cols[2].w,HH);
+  x.fillStyle='#e2f2e9';x.fillRect(cols[3].l,y,cols[3].w,HH);
+  cols.forEach((k,i)=>ar(k.label,k.r-22,y+42,font(600,23),i===3?GOOD:ACC));
+  y+=HH;
+  if(!rows.length){ar('لا توجد حركات',cols[0].r-22,y+38,font(400,23),MUTED);line(M,y+RH,R,y+RH,LINE,1);y+=RH;}
+  rows.forEach((r,i)=>{
+    if(i%2){x.fillStyle='#f7f9f9';x.fillRect(M,y,TW,RH);}
+    ar(arDate(r.date),cols[0].r-22,y+38,font(400,23),MUTED);
+    ar(fit(r.desc,font(500,24),cols[1].w-40),cols[1].r-22,y+38,font(500,24));
+    if(r.debit)ar(mv(r.debit),cols[2].r-22,y+38,font(500,24));
+    if(r.credit)ar(mv(r.credit),cols[3].r-22,y+38,font(500,24),GOOD);
+    line(M,y+RH,R,y+RH,LINE,1);
+    y+=RH;
+  });
+  line(M,y,R,y,INK,2);
+  cols.slice(1).forEach(k=>line(k.r,TY,k.r,y,LINE,1));
+  line(M,TY,M,y,LINE,1);line(R,TY,R,y,LINE,1);line(M,TY,R,TY,LINE,1);
+  y+=40;
+  // remaining
+  x.fillStyle=ACC;x.fillRect(M,y,TW,170);
+  x.fillStyle='#f0b84a';x.fillRect(R-10,y,10,170);
+  if(c.bal===0){ar('الحساب مسدَّد بالكامل',R-44,y+104,font(700,46),WHITE);}
+  else{ar(w.label,R-44,y+72,font(600,32),'#cfe6e7');ar(mv(Math.abs(c.bal)),R-44,y+136,font(700,58),WHITE);}
+  const png=await new Promise(res=>cv.toBlob(res,'image/png'));
+  return previewAndSave([cv],fileBase(name)+'.png',png);
 }
-const exportImage=n=>buildStatement(n,true);
+const exportImage=n=>buildStatement(n);
 /* ---------- remaining-debt invoice (image) ---------- */
 async function buildInvoice(name){
   const c=customerList().find(x=>x.name===name);if(!c)return;
