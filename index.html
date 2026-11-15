@@ -22,7 +22,7 @@
 <meta property="og:image:height" content="512">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:image" content="https://atigh85.github.io/daftar/icons/icon-512.png">
-<script>window.DAFTAR_LOCAL=true;window.DAFTAR_BUILD="2026-11-15 13:06";</script>
+<script>window.DAFTAR_LOCAL=true;window.DAFTAR_BUILD="2026-11-15 13:11";</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Reem+Kufi:wght@600;700&display=swap" rel="stylesheet">
 <style>
@@ -72,6 +72,7 @@ html{-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
 .btn:disabled{opacity:.5;cursor:not-allowed}
 .link{border:0;background:none;color:var(--accent);padding:0;font-weight:600;text-align:start}
 .del{border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:6px;padding:2px 10px;font-size:13px;white-space:nowrap}
+.acts{display:flex;flex-direction:column;gap:4px;align-items:flex-start}
 .del.armed,.btn.armed{border-color:var(--bad);background:var(--bad-soft);color:var(--bad)}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
@@ -168,14 +169,14 @@ dialog h2{margin:0;font-size:18px}
   form.entry .wide{grid-column:auto}
   .three{grid-template-columns:1fr}
   /* pop-up windows fill the phone screen; actions stay at the bottom */
-  #settings,#pv,#mo{width:100vw;max-width:100vw;height:100vh;height:100dvh;max-height:100vh;max-height:100dvh;margin:0;inset:0;border:0;border-radius:0;padding:16px}
-  #settings[open],#pv[open],#mo[open]{display:flex;flex-direction:column}
-  #settings form{flex:1;min-height:0;overflow:auto}
-  #settings form>.actions:last-child{margin-top:auto;position:sticky;bottom:0;background:var(--surface);padding-top:10px}
+  #settings,#pv,#mo,#ed{width:100vw;max-width:100vw;height:100vh;height:100dvh;max-height:100vh;max-height:100dvh;margin:0;inset:0;border:0;border-radius:0;padding:16px}
+  #settings[open],#pv[open],#mo[open],#ed[open]{display:flex;flex-direction:column}
+  #settings form,#ed form{flex:1;min-height:0;overflow:auto}
+  #settings form>.actions:last-child,#ed form>.actions:last-child{margin-top:auto;position:sticky;bottom:0;background:var(--surface);padding-top:10px}
   #pv-body,#mo-body{flex:1;min-height:0;max-height:none}
   nav.tabs{gap:2px}
   nav.tabs a{font-size:15px;padding:10px 2px}
-  #pv .actions .btn,#mo .actions .btn,#settings form>.actions:last-child .btn{flex:1;min-height:46px}
+  #pv .actions .btn,#mo .actions .btn,#settings form>.actions:last-child .btn,#ed form>.actions:last-child .btn{flex:1;min-height:46px}
   input,select{font-size:16px}
   table{min-width:0;font-size:13px}
   th{font-size:12px;white-space:normal}
@@ -320,6 +321,21 @@ dialog h2{margin:0;font-size:18px}
   </div>
 </dialog>
 
+<dialog id="ed">
+  <form id="f-ed" novalidate>
+    <h2 id="ed-title"></h2>
+    <label class="f" id="ed-date-w">التاريخ<input type="date" id="ed-date"></label>
+    <label class="f" id="ed-party-w"><span id="ed-party-l"></span><input type="text" id="ed-party" autocomplete="off"></label>
+    <label class="f" id="ed-desc-w">البيان<input type="text" id="ed-desc"></label>
+    <label class="f" id="ed-amt-w"><span id="ed-amt-l"></span><input class="amt" type="text" inputmode="decimal" id="ed-amt"></label>
+    <label class="f" id="ed-phone-w">الهاتف (اختياري)<input type="text" inputmode="tel" id="ed-phone" style="direction:ltr;text-align:right"></label>
+    <div class="actions" style="justify-content:flex-end">
+      <button class="btn ghost small" type="button" id="ed-cancel">إلغاء</button>
+      <button class="btn small" type="submit">حفظ التعديل</button>
+    </div>
+  </form>
+</dialog>
+
 <div id="toast" role="status" aria-live="polite"></div>
 
 <script>
@@ -401,6 +417,10 @@ async function addDoc(col,data){
 async function delDoc(col,id){
   if(db){await db.doc(col+'/'+id).delete();}
   else{state[col]=state[col].filter(x=>x.id!==id);persist();renderAll();}
+}
+async function updDoc(col,id,patch){
+  if(db){await db.doc(col+'/'+id).update(patch);}
+  else{state[col]=state[col].map(x=>x.id===id?Object.assign({},x,patch):x);persist();renderAll();}
 }
 async function ensureParty(k,name){
   const col=KINDS[k].people;
@@ -499,6 +519,7 @@ function balanceWords(bal,k){
 const money=c=>'<span class="num">'+fmt(c)+'</span> <small>'+esc(cur())+'</small>';
 const mc=(c,cls,strong)=>'<td class="mny'+(cls?' '+cls:'')+'">'+'<span>'+(strong?'<strong>':'')+'<bdi dir="ltr">'+fmt(c)+'</bdi>'+(strong?'</strong>':'')+' <small>'+esc(cur())+'</small></span></td>';
 const delBtn=(col,id)=>'<button class="del" type="button" data-del="'+col+'" data-id="'+esc(id)+'">حذف</button>';
+const editBtn=(col,id)=>'<button class="del" type="button" data-edit="'+col+'" data-id="'+esc(id)+'">تعديل</button>';
 const partyLink=(k,name)=>'<button class="link" type="button" data-party="'+k+'" data-name="'+esc(name)+'">'+esc(name)+'</button>';
 const pos=(t,c)=>t+(c.bal>0?c.bal:0);
 function renderSummary(){
@@ -518,7 +539,7 @@ function renderSales(){
   const rows=state.sales.filter(r=>!q||(r.customer||'').includes(q)||(r.desc||'').includes(q)).sort(byNewest);
   if(!rows.length){$('#sales-list').innerHTML='<p class="empty">'+(q?'لا توجد نتائج مطابقة.':'لا توجد مبيعات بعد. سجّل أول عملية بيع من النموذج أعلاه.')+'</p>';return;}
   $('#sales-list').innerHTML='<table><thead><tr><th>التاريخ</th><th>الزبون</th><th>البيان</th><th class="num">قيمة البيع</th><th></th></tr></thead><tbody>'+
-    rows.map(r=>'<tr><td class="date">'+dt(r.date)+'</td><td>'+partyLink('cust',r.customer)+'</td><td class="desc">'+esc(r.desc)+'</td>'+mc(cents(r.amount))+'<td>'+delBtn('sales',r.id)+'</td></tr>').join('')+
+    rows.map(r=>'<tr><td class="date">'+dt(r.date)+'</td><td>'+partyLink('cust',r.customer)+'</td><td class="desc">'+esc(r.desc)+'</td>'+mc(cents(r.amount))+'<td><div class="acts">'+editBtn('sales',r.id)+delBtn('sales',r.id)+'</div></td></tr>').join('')+
     '<tr class="total"><td colspan="3">الإجمالي</td>'+mc(sumC(rows))+'<td></td></tr></tbody></table>';
 }
 function renderPurchases(){
@@ -526,7 +547,7 @@ function renderPurchases(){
   const rows=state.purchases.filter(r=>!q||(r.supplier||'').includes(q)||(r.desc||'').includes(q)).sort(byNewest);
   if(!rows.length){$('#purch-list').innerHTML='<p class="empty">'+(q?'لا توجد نتائج مطابقة.':'لا توجد مشتريات بعد. سجّل أول عملية شراء من النموذج أعلاه.')+'</p>';return;}
   $('#purch-list').innerHTML='<table><thead><tr><th>التاريخ</th><th>المورّد</th><th>البيان</th><th class="num">قيمة الشراء</th><th></th></tr></thead><tbody>'+
-    rows.map(r=>'<tr><td class="date">'+dt(r.date)+'</td><td>'+(r.supplier?partyLink('supp',r.supplier):'<span class="note">—</span>')+'</td><td class="desc">'+esc(r.desc)+'</td>'+mc(cents(r.amount))+'<td>'+delBtn('purchases',r.id)+'</td></tr>').join('')+
+    rows.map(r=>'<tr><td class="date">'+dt(r.date)+'</td><td>'+(r.supplier?partyLink('supp',r.supplier):'<span class="note">—</span>')+'</td><td class="desc">'+esc(r.desc)+'</td>'+mc(cents(r.amount))+'<td><div class="acts">'+editBtn('purchases',r.id)+delBtn('purchases',r.id)+'</div></td></tr>').join('')+
     '<tr class="total"><td colspan="3">الإجمالي</td>'+mc(sumC(rows))+'<td></td></tr></tbody></table>';
 }
 function partyView(k){
@@ -585,14 +606,14 @@ function renderDetail(k,c){
   const K=KINDS[k],rows=ledger(k,c.name),w=balanceWords(c.bal,k);
   $('#'+k+'-dname').textContent=c.name;
   $('#'+k+'-dsub').innerHTML=(c.phone?'<span class="num">'+esc(c.phone)+'</span> · ':'')+w.pill+
-    (!rows.length&&c.id?' · '+delBtn(K.people,c.id):'');
+    ' · <button class="del" type="button" data-editparty="'+k+'">تعديل</button>'+(!rows.length&&c.id?' '+delBtn(K.people,c.id):'');
   $('#'+k+'-figs').innerHTML=
     '<div class="fig"><div class="lbl">'+K.fig1+'</div><div class="val">'+money(c.debit)+'</div></div>'+
     '<div class="fig"><div class="lbl">'+K.fig2+'</div><div class="val credit">'+money(c.credit)+'</div></div>'+
     '<div class="fig due"><div class="lbl">'+w.label+'</div><div class="val">'+money(Math.abs(c.bal))+'</div></div>';
   if(!rows.length){$('#'+k+'-ledger').innerHTML='<p class="empty">لا توجد حركات على هذا الحساب بعد.</p>';return;}
   $('#'+k+'-ledger').innerHTML='<table class="led"><thead><tr><th>التاريخ</th><th>البيان</th><th class="num">'+K.docCol+'</th><th class="num">المدفوع</th></tr></thead><tbody>'+
-    rows.map(r=>'<tr><td class="date">'+dt(r.date)+'</td><td class="c-main"><span class="what">'+esc(r.desc)+'</span><span class="meta">'+delBtn(r.col,r.id)+'</span></td>'+(r.debit?mc(r.debit):'<td></td>')+(r.credit?mc(r.credit,'credit'):'<td></td>')+'</tr>').join('')+
+    rows.map(r=>'<tr><td class="date">'+dt(r.date)+'</td><td class="c-main"><span class="what">'+esc(r.desc)+'</span><span class="meta">'+editBtn(r.col,r.id)+delBtn(r.col,r.id)+'</span></td>'+(r.debit?mc(r.debit):'<td></td>')+(r.credit?mc(r.credit,'credit'):'<td></td>')+'</tr>').join('')+
     '<tr class="total"><td colspan="2">'+w.label+'</td><td colspan="2" class="mny"><span><strong><bdi dir="ltr">'+fmt(Math.abs(c.bal))+'</bdi></strong> <small>'+esc(cur())+'</small></span></td></tr></tbody></table>';
 }
 function renderAll(){renderSummary();renderSales();renderPurchases();KS.forEach(renderParty);}
@@ -625,7 +646,7 @@ $('#v-suppliers').innerHTML=partyView('supp');
 $('#v-customers').innerHTML=partyView('cust');
 $('#pv-ok').textContent=LOCAL?'إرسال':'تنزيل';
 
-['#s-date','#p-date','#cust-ydate','#supp-ydate'].forEach(sel=>{
+['#s-date','#p-date','#cust-ydate','#supp-ydate','#ed-date'].forEach(sel=>{
   const inp=$(sel),w=document.createElement('span'),lab=document.createElement('span');
   inp.value=today();
   w.className='datewrap';lab.className='datetxt';
@@ -715,6 +736,10 @@ $('#purch-q').addEventListener('input',renderPurchases);
 document.addEventListener('click',async e=>{
   const c=e.target.closest('[data-party]');
   if(c){openParty(c.dataset.party,c.dataset.name);return;}
+  const ed=e.target.closest('[data-edit]');
+  if(ed){openEdit(ed.dataset.edit,ed.dataset.id);return;}
+  const ep=e.target.closest('[data-editparty]');
+  if(ep){openEditParty(ep.dataset.editparty);return;}
   const b=e.target.closest('[data-del]');
   if(!b)return;
   if(!b.dataset.armed){
@@ -725,6 +750,75 @@ document.addEventListener('click',async e=>{
   b.disabled=true;
   try{await delDoc(b.dataset.del,b.dataset.id);toast('تم الحذف');}
   catch(err){b.disabled=false;saveFailed(err);}
+});
+
+/* ---------- editing saved entries ---------- */
+const COLKIND={sales:'cust',payments:'cust',purchases:'supp',spays:'supp'};
+let edItem=null;
+const edShow=(sel,on)=>{$(sel).hidden=!on;};
+function openEdit(col,id){
+  const r=state[col].find(x=>x.id===id),k=COLKIND[col];if(!r||!k)return;
+  const K=KINDS[k],isDoc=col===K.docs,at=!!r.atSale||String(r.desc||'').indexOf('دفعة عند')===0;
+  edItem={mode:isDoc?'doc':'pay',k:k,col:col,id:id,rec:r,at:at};
+  $('#ed-title').textContent=isDoc?(k==='cust'?'تعديل عملية بيع':'تعديل عملية شراء'):'تعديل دفعة';
+  edShow('#ed-date-w',true);edShow('#ed-party-w',isDoc);edShow('#ed-desc-w',isDoc||!at);edShow('#ed-amt-w',true);edShow('#ed-phone-w',false);
+  $('#ed-party-l').textContent=K.nameLabel+(k==='supp'?' (اختياري)':'');
+  $('#ed-party').setAttribute('list',k+'-names');
+  $('#ed-amt-l').textContent=isDoc?(k==='cust'?'قيمة البيع':'قيمة الشراء'):'مبلغ الدفعة';
+  $('#ed-date').value=r.date||today();$('#ed-party').value=r[K.key]||'';
+  $('#ed-desc').value=isDoc?(r.desc||''):((at||r.desc==='دفعة')?'':(r.desc||''));
+  $('#ed-amt').value=String(r.amount);
+  refreshDates();openDialog($('#ed'));
+}
+function openEditParty(k){
+  const K=KINDS[k],c=partyList(k).find(x=>x.name===current[k]);if(!c)return;
+  edItem={mode:'party',k:k,old:c};
+  $('#ed-title').textContent='تعديل بيانات '+K.one;
+  edShow('#ed-date-w',false);edShow('#ed-party-w',true);edShow('#ed-desc-w',false);edShow('#ed-amt-w',false);edShow('#ed-phone-w',true);
+  $('#ed-party-l').textContent=K.nameLabel;$('#ed-party').removeAttribute('list');
+  $('#ed-party').value=c.name;$('#ed-phone').value=c.phone||'';
+  openDialog($('#ed'));
+}
+$('#ed-cancel').addEventListener('click',()=>{edItem=null;$('#ed').close();});
+$('#f-ed').addEventListener('submit',async e=>{
+  e.preventDefault();if(!guard()||!edItem)return;
+  const it=edItem,K=KINDS[it.k];
+  try{
+    if(it.mode==='party'){
+      const name=norm($('#ed-party').value),phone=norm($('#ed-phone').value),old=it.old.name;
+      if(!name)return bad('#ed-party',K.needName);
+      if(name!==old&&partyList(it.k).some(c=>c.name===name))return bad('#ed-party',K.dup);
+      if(it.old.id)await updDoc(K.people,it.old.id,{name:name,phone:phone});
+      else await addDoc(K.people,{name:name,phone:phone});
+      if(name!==old){
+        if(current[it.k]===old)current[it.k]=name;
+        const patch={};patch[K.key]=name;
+        for(const col of [K.docs,K.pays]){
+          const ids=state[col].filter(x=>x[K.key]===old).map(x=>x.id);
+          for(const id of ids)await updDoc(col,id,patch);
+        }
+        renderParty(it.k);
+      }
+    }else{
+      const date=$('#ed-date').value,amount=parseAmount($('#ed-amt').value),desc=norm($('#ed-desc').value);
+      if(!date)return bad('#ed-date','اختر التاريخ.');
+      if(!(amount>0))return bad('#ed-amt','اكتب المبلغ رقمًا أكبر من صفر.');
+      if(it.mode==='pay'){
+        await updDoc(it.col,it.id,{date:date,amount:amount,desc:it.at?it.rec.desc:(desc||'دفعة')});
+      }else{
+        const party=norm($('#ed-party').value),old=it.rec[K.key]||'';
+        if(it.k==='cust'&&!party)return bad('#ed-party',K.needName);
+        if(!desc)return bad('#ed-desc','اكتب البيان.');
+        if(party)await ensureParty(it.k,party);
+        const patch={date:date,desc:desc,amount:amount};patch[K.key]=party;
+        // the payment made at the time of this sale or purchase follows it
+        const linked=state[K.pays].find(p=>p.atSale&&p[K.key]===old&&old&&p.createdAt===(it.rec.createdAt||0)+1);
+        await updDoc(it.col,it.id,patch);
+        if(linked&&party){const lp={date:date};lp[K.key]=party;await updDoc(K.pays,linked.id,lp);}
+      }
+    }
+    edItem=null;$('#ed').close();toast('حُفظ التعديل');
+  }catch(err){saveFailed(err);}
 });
 
 /* ---------- monthly payments ---------- */
