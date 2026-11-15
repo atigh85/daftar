@@ -22,7 +22,7 @@
 <meta property="og:image:height" content="512">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:image" content="https://atigh85.github.io/daftar/icons/icon-512.png">
-<script>window.DAFTAR_LOCAL=true;window.DAFTAR_BUILD="2026-11-15 13:45";</script>
+<script>window.DAFTAR_LOCAL=true;window.DAFTAR_BUILD="2026-11-15 13:53";</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Reem+Kufi:wght@600;700&display=swap" rel="stylesheet">
 <style>
@@ -75,7 +75,7 @@ html{-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
 .sugwrap{position:relative;display:block;min-width:0}
 .bar .sugwrap{flex:1 1 160px;max-width:220px}
 .bar .sugwrap input{max-width:none}
-.sug{position:absolute;inset-inline:0;top:calc(100% + 4px);z-index:30;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.14);max-height:250px;overflow:auto;padding:4px}
+.sug{position:absolute;inset-inline:0;top:calc(100% + 4px);z-index:30;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.14);padding:4px;touch-action:none}
 .sug button{display:block;width:100%;text-align:start;border:0;background:none;color:var(--ink);padding:10px 12px;border-radius:8px;font:inherit}
 .sug button:hover,.sug button:focus-visible{background:var(--accent-soft)}
 .acts{display:flex;flex-direction:column;gap:4px;align-items:flex-start}
@@ -691,7 +691,7 @@ function suggest(sel,kind){
   const show=()=>{
     const k=typeof kind==='function'?kind():kind;
     if(picked){picked=false;return;}
-    const m=k?matchNames(k,inp.value).slice(0,8):[];
+    const m=k?matchNames(k,inp.value).slice(0,5):[];
     if(!m.length||(m.length===1&&m[0]===norm(inp.value))){box.hidden=true;return;}
     box.innerHTML=m.map(n=>'<button type="button" data-n="'+esc(n)+'">'+esc(n)+'</button>').join('');
     box.hidden=false;
@@ -708,13 +708,12 @@ function suggest(sel,kind){
   };
   inp.addEventListener('input',show);inp.addEventListener('focus',show);
   inp.addEventListener('blur',()=>setTimeout(()=>{if(!held&&Date.now()-last>450)box.hidden=true;},200));
-  box.addEventListener('pointerdown',e=>{held=true;sx=e.clientX;sy=e.clientY;if(e.pointerType==='mouse')e.preventDefault();});
-  box.addEventListener('pointerup',e=>{
-    const still=Math.abs(e.clientX-sx)<12&&Math.abs(e.clientY-sy)<12;
-    held=false;
-    if(still)pick(e.target.closest('button'));
-  });
-  box.addEventListener('pointercancel',()=>{held=false;});
+  box.addEventListener('touchstart',e=>{
+    const btn=e.target.closest('button');if(!btn)return;
+    e.preventDefault();pick(btn);
+  },{passive:false});
+  box.addEventListener('mousedown',e=>{e.preventDefault();held=true;});
+  document.addEventListener('mouseup',()=>{held=false;});
   box.addEventListener('click',e=>pick(e.target.closest('button')));
 }
 function clearSearch(){
