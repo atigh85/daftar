@@ -22,7 +22,7 @@
 <meta property="og:image:height" content="512">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:image" content="https://atigh85.github.io/daftar/icons/icon-512.png">
-<script>window.DAFTAR_LOCAL=true;window.DAFTAR_BUILD="2026-11-15 13:36";</script>
+<script>window.DAFTAR_LOCAL=true;window.DAFTAR_BUILD="2026-11-15 13:45";</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Reem+Kufi:wght@600;700&display=swap" rel="stylesheet">
 <style>
@@ -489,15 +489,19 @@ async function checkUpdate(){
 }
 
 /* ---------- derived data ---------- */
+let plCache={};
 function partyList(k){
+  if(plCache[k])return plCache[k];
   const K=KINDS[k],m=new Map();
-  state[K.people].forEach(c=>{if(c.name)m.set(c.name,{name:c.name,phone:c.phone||'',id:c.id});});
-  state[K.docs].concat(state[K.pays]).forEach(r=>{const n=r[K.key];if(n&&!m.has(n))m.set(n,{name:n,phone:''});});
-  return Array.from(m.values()).map(c=>{
-    const debit=sumC(state[K.docs].filter(s=>s[K.key]===c.name));
-    const credit=sumC(state[K.pays].filter(p=>p[K.key]===c.name));
-    return Object.assign(c,{debit:debit,credit:credit,bal:debit-credit});
-  }).sort((a,b)=>b.bal-a.bal||a.name.localeCompare(b.name,'ar'));
+  const get=n=>{let c=m.get(n);if(!c){c={name:n,phone:'',debit:0,credit:0};m.set(n,c);}return c;};
+  state[K.people].forEach(c=>{if(c.name){const x=get(c.name);x.phone=c.phone||'';x.id=c.id;}});
+  state[K.docs].forEach(r=>{if(r[K.key])get(r[K.key]).debit+=cents(r.amount);});
+  state[K.pays].forEach(r=>{if(r[K.key])get(r[K.key]).credit+=cents(r.amount);});
+  const out=Array.from(m.values());
+  out.forEach(c=>{c.bal=c.debit-c.credit;});
+  out.sort((a,b)=>b.bal-a.bal||a.name.localeCompare(b.name,'ar'));
+  plCache[k]=out;
+  return out;
 }
 function ledger(k,name){
   const K=KINDS[k];
@@ -543,7 +547,7 @@ function renderSummary(){
 }
 function renderSales(){
   const q=norm($('#sales-q').value);
-  const rows=state.sales.filter(r=>!q||(r.customer||'').includes(q)||(r.desc||'').includes(q)).sort(byNewest);
+  const nq=nrm(q),rows=state.sales.filter(r=>!q||nrm(r.customer||'').includes(nq)||nrm(r.desc||'').includes(nq)).sort(byNewest);
   if(!rows.length){$('#sales-list').innerHTML='<p class="empty">'+(q?'لا توجد نتائج مطابقة.':'لا توجد مبيعات بعد. سجّل أول عملية بيع من النموذج أعلاه.')+'</p>';return;}
   $('#sales-list').innerHTML='<table><thead><tr><th>التاريخ</th><th>الزبون</th><th>البيان</th><th class="num">قيمة البيع</th><th></th></tr></thead><tbody>'+
     rows.map(r=>'<tr><td class="date">'+dt(r.date)+'</td><td>'+partyLink('cust',r.customer)+'</td><td class="desc">'+esc(r.desc)+'</td>'+mc(cents(r.amount))+'<td><div class="acts">'+editBtn('sales',r.id)+delBtn('sales',r.id)+'</div></td></tr>').join('')+
@@ -551,7 +555,7 @@ function renderSales(){
 }
 function renderPurchases(){
   const q=norm($('#purch-q').value);
-  const rows=state.purchases.filter(r=>!q||(r.supplier||'').includes(q)||(r.desc||'').includes(q)).sort(byNewest);
+  const nq=nrm(q),rows=state.purchases.filter(r=>!q||nrm(r.supplier||'').includes(nq)||nrm(r.desc||'').includes(nq)).sort(byNewest);
   if(!rows.length){$('#purch-list').innerHTML='<p class="empty">'+(q?'لا توجد نتائج مطابقة.':'لا توجد مشتريات بعد. سجّل أول عملية شراء من النموذج أعلاه.')+'</p>';return;}
   $('#purch-list').innerHTML='<table><thead><tr><th>التاريخ</th><th>المورّد</th><th>البيان</th><th class="num">قيمة الشراء</th><th></th></tr></thead><tbody>'+
     rows.map(r=>'<tr><td class="date">'+dt(r.date)+'</td><td>'+(r.supplier?partyLink('supp',r.supplier):'<span class="note">—</span>')+'</td><td class="desc">'+esc(r.desc)+'</td>'+mc(cents(r.amount))+'<td><div class="acts">'+editBtn('purchases',r.id)+delBtn('purchases',r.id)+'</div></td></tr>').join('')+
@@ -624,7 +628,7 @@ function renderDetail(k,c){
     rows.map(r=>'<tr><td class="date">'+dt(r.date)+'</td><td class="c-main"><span class="what">'+esc(r.desc)+'</span><span class="meta">'+editBtn(r.col,r.id)+delBtn(r.col,r.id)+'</span></td>'+(r.debit?mc(r.debit):'<td></td>')+(r.credit?mc(r.credit,'credit'):'<td></td>')+'</tr>').join('')+
     '<tr class="total"><td colspan="2">'+w.label+'</td><td colspan="2" class="mny"><span><strong><bdi dir="ltr">'+fmt(Math.abs(c.bal))+'</bdi></strong> <small>'+esc(cur())+'</small></span></td></tr></tbody></table>';
 }
-function renderAll(){renderSummary();renderSales();renderPurchases();KS.forEach(renderParty);}
+function renderAll(){plCache={};renderSummary();renderSales();renderPurchases();KS.forEach(renderParty);}
 
 /* ---------- tabs ---------- */
 const TABS=['purchases','sales','suppliers','customers'];
@@ -649,6 +653,15 @@ function guard(){if(!ready){toast('لحظة، جارٍ تجهيز الحفظ…'
 function saveFailed(e){toast(e&&e.code==='quota_exceeded'?'امتلأت مساحة البيانات. احذف سجلات قديمة ثم أعد المحاولة.':'تعذّر الحفظ. قد لا تملك صلاحية التعديل على هذه الصفحة.',true);}
 function openDialog(d){if(d.showModal)d.showModal();else d.setAttribute('open','');}
 
+function onSubmit(sel,fn){
+  $(sel).addEventListener('submit',async e=>{
+    e.preventDefault();
+    const f=e.currentTarget;if(f.dataset.busy)return;
+    f.dataset.busy='1';
+    try{await fn(e);}finally{delete f.dataset.busy;}
+  });
+}
+function closeDialog(d){if(d.close){if(d.open)d.close();}else d.removeAttribute('open');}
 /* ---------- build the two account views, then wire the forms ---------- */
 $('#v-suppliers').innerHTML=partyView('supp');
 $('#v-customers').innerHTML=partyView('cust');
@@ -677,20 +690,32 @@ function suggest(sel,kind){
   let picked=false;
   const show=()=>{
     const k=typeof kind==='function'?kind():kind;
-    if(picked){picked=false;box.hidden=true;return;}
+    if(picked){picked=false;return;}
     const m=k?matchNames(k,inp.value).slice(0,8):[];
     if(!m.length||(m.length===1&&m[0]===norm(inp.value))){box.hidden=true;return;}
     box.innerHTML=m.map(n=>'<button type="button" data-n="'+esc(n)+'">'+esc(n)+'</button>').join('');
     box.hidden=false;
   };
-  inp.addEventListener('input',show);inp.addEventListener('focus',show);
-  inp.addEventListener('blur',()=>setTimeout(()=>{box.hidden=true;},180));
-  box.addEventListener('pointerdown',e=>e.preventDefault());
-  box.addEventListener('click',e=>{
-    const b=e.target.closest('button');if(!b)return;
-    inp.value=b.dataset.n;picked=true;box.hidden=true;
+  let held=false,sx=0,sy=0,last=0;
+  const pick=btn=>{
+    if(!btn||Date.now()-last<400)return;
+    last=Date.now();
+    inp.value=btn.dataset.n;picked=true;
+    box.style.opacity='0';
+    setTimeout(()=>{box.hidden=true;box.style.opacity='';},420);
     inp.dispatchEvent(new Event('input',{bubbles:true}));
+    inp.blur();
+  };
+  inp.addEventListener('input',show);inp.addEventListener('focus',show);
+  inp.addEventListener('blur',()=>setTimeout(()=>{if(!held&&Date.now()-last>450)box.hidden=true;},200));
+  box.addEventListener('pointerdown',e=>{held=true;sx=e.clientX;sy=e.clientY;if(e.pointerType==='mouse')e.preventDefault();});
+  box.addEventListener('pointerup',e=>{
+    const still=Math.abs(e.clientX-sx)<12&&Math.abs(e.clientY-sy)<12;
+    held=false;
+    if(still)pick(e.target.closest('button'));
   });
+  box.addEventListener('pointercancel',()=>{held=false;});
+  box.addEventListener('click',e=>pick(e.target.closest('button')));
 }
 function clearSearch(){
   ['#sales-q','#purch-q','#cust-q','#supp-q'].forEach(q=>{$(q).value='';});
@@ -698,7 +723,7 @@ function clearSearch(){
 }
 const refreshDates=()=>document.querySelectorAll('.datewrap input').forEach(i=>i._up());
 
-$('#f-sale').addEventListener('submit',async e=>{
+onSubmit('#f-sale',async e=>{
   e.preventDefault();if(!guard())return;
   const date=$('#s-date').value,customer=norm($('#s-cust').value),desc=norm($('#s-desc').value);
   const amount=parseAmount($('#s-amt').value),paidRaw=$('#s-paid').value.trim(),paid=paidRaw?parseAmount(paidRaw):0;
@@ -717,7 +742,7 @@ $('#f-sale').addEventListener('submit',async e=>{
   }catch(err){saveFailed(err);}
 });
 
-$('#f-purchase').addEventListener('submit',async e=>{
+onSubmit('#f-purchase',async e=>{
   e.preventDefault();if(!guard())return;
   const date=$('#p-date').value,supplier=norm($('#p-supp').value),desc=norm($('#p-desc').value);
   const amount=parseAmount($('#p-amt').value),paidRaw=$('#p-paid').value.trim(),paid=paidRaw?parseAmount(paidRaw):0;
@@ -746,7 +771,7 @@ function pickParty(k){
 }
 KS.forEach(k=>{
   const K=KINDS[k];
-  $('#'+k+'-form').addEventListener('submit',async e=>{
+  onSubmit('#'+k+'-form',async e=>{
     e.preventDefault();if(!guard())return;
     const name=norm($('#'+k+'-name').value),phone=norm($('#'+k+'-phone').value);
     if(!name)return bad('#'+k+'-name',K.needName);
@@ -754,7 +779,7 @@ KS.forEach(k=>{
     try{await addDoc(K.people,{name:name,phone:phone});$('#'+k+'-name').value='';$('#'+k+'-phone').value='';toast(K.added+name);}
     catch(err){saveFailed(err);}
   });
-  $('#'+k+'-fpay').addEventListener('submit',async e=>{
+  onSubmit('#'+k+'-fpay',async e=>{
     e.preventDefault();if(!guard()||!current[k])return;
     const date=$('#'+k+'-ydate').value,desc=norm($('#'+k+'-ydesc').value),amount=parseAmount($('#'+k+'-yamt').value);
     if(!date)return bad('#'+k+'-ydate','اختر تاريخ الدفعة.');
@@ -834,8 +859,8 @@ function openEditParty(k){
   $('#ed-party').value=c.name;$('#ed-phone').value=c.phone||'';
   openDialog($('#ed'));
 }
-$('#ed-cancel').addEventListener('click',()=>{edItem=null;$('#ed').close();});
-$('#f-ed').addEventListener('submit',async e=>{
+$('#ed-cancel').addEventListener('click',()=>{edItem=null;closeDialog($('#ed'));});
+onSubmit('#f-ed',async e=>{
   e.preventDefault();if(!guard()||!edItem)return;
   const it=edItem,K=KINDS[it.k];
   try{
@@ -877,7 +902,7 @@ $('#f-ed').addEventListener('submit',async e=>{
         else if(paid>0){const q={date:date,amount:paid,desc:payDesc,atSale:true,createdAt:(it.rec.createdAt||Date.now())+1};q[K.key]=party;await addDoc(K.pays,q);}
       }
     }
-    edItem=null;$('#ed').close();toast('حُفظ التعديل');
+    edItem=null;closeDialog($('#ed'));toast('حُفظ التعديل');
   }catch(err){saveFailed(err);}
 });
 
@@ -910,7 +935,7 @@ function renderMonth(){
   $('#mo-body').scrollTop=0;
 }
 $('#mo-sel').addEventListener('change',renderMonth);
-$('#mo-close').addEventListener('click',()=>$('#mo').close());
+$('#mo-close').addEventListener('click',()=>closeDialog($('#mo')));
 
 /* ---------- command box: one sentence in, the matching form filled for review ---------- */
 const nrm=s=>String(s).normalize('NFKC').replace(/[\u064B-\u065F\u0670\u0640\u061C\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/g,'').replace(/[\u06CC\u06CD\u06D0]/g,'\u064A').replace(/\u06A9/g,'\u0643').replace(/[\u06BE\u06C1\u06D5]/g,'\u0647').replace(/[\u06F0-\u06F9]/g,d=>d.charCodeAt(0)-0x06F0).replace(/\u0671/g,'\u0627').replace(/[أإآ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه').replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/٫/g,'.').replace(/٬/g,',');
@@ -1100,11 +1125,11 @@ $('#f-cmd').addEventListener('submit',e=>{e.preventDefault();const el=$('#cmd');
 /* ---------- settings ---------- */
 const dlg=$('#settings');
 $('#open-settings').addEventListener('click',()=>{$('#set-biz').value=state.settings.biz;$('#set-cur').value=state.settings.cur;if(LOCAL)renderSnaps();openDialog(dlg);});
-$('#set-cancel').addEventListener('click',()=>dlg.close());
-$('#f-settings').addEventListener('submit',async e=>{
+$('#set-cancel').addEventListener('click',()=>closeDialog(dlg));
+onSubmit('#f-settings',async e=>{
   e.preventDefault();if(!guard())return;
   const v={biz:norm($('#set-biz').value),cur:norm($('#set-cur').value)||'أوقية'};
-  try{if(db)await db.doc('settings/main').set(v);state.settings=v;persist();renderAll();dlg.close();toast('حُفظت الإعدادات');}
+  try{if(db)await db.doc('settings/main').set(v);state.settings=v;persist();renderAll();closeDialog(dlg);toast('حُفظت الإعدادات');}
   catch(err){saveFailed(err);}
 });
 
@@ -1137,7 +1162,7 @@ function exportBackup(){
 $('#bk-save').addEventListener('click',exportBackup);
 $('#bk-now').addEventListener('click',exportBackup);
 $('#bk-later').addEventListener('click',()=>{try{sessionStorage.setItem('bk-later','1');}catch(e){}$('#bk-banner').hidden=true;});
-function restored(msg){current.cust=null;current.supp=null;persist();renderAll();dlg.close();toast(msg);}
+function restored(msg){current.cust=null;current.supp=null;persist();renderAll();closeDialog(dlg);toast(msg);}
 let pendingBackup=null;
 $('#bk-load').addEventListener('click',()=>{
   const b=$('#bk-load');
@@ -1167,7 +1192,7 @@ $('#snap-load').addEventListener('click',()=>{
 
 /* ---------- export ---------- */
 let pvItem=null;
-function closePreview(){pvItem=null;const d=$('#pv');if(d.open)d.close();$('#pv-body').innerHTML='';}
+function closePreview(){pvItem=null;closeDialog($('#pv'));$('#pv-body').innerHTML='';}
 function previewAndSave(canvases,filename,data){
   const body=$('#pv-body');body.innerHTML='';
   canvases.forEach(cv=>body.appendChild(cv));
