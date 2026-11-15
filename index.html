@@ -22,7 +22,7 @@
 <meta property="og:image:height" content="512">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:image" content="https://atigh85.github.io/daftar/icons/icon-512.png">
-<script>window.DAFTAR_LOCAL=true;window.DAFTAR_BUILD="2026-11-15 13:20";</script>
+<script>window.DAFTAR_LOCAL=true;window.DAFTAR_BUILD="2026-11-15 13:26";</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Reem+Kufi:wght@600;700&display=swap" rel="stylesheet">
 <style>
@@ -328,6 +328,7 @@ dialog h2{margin:0;font-size:18px}
     <label class="f" id="ed-party-w"><span id="ed-party-l"></span><input type="text" id="ed-party" autocomplete="off"></label>
     <label class="f" id="ed-desc-w">البيان<input type="text" id="ed-desc"></label>
     <label class="f" id="ed-amt-w"><span id="ed-amt-l"></span><input class="amt" type="text" inputmode="decimal" id="ed-amt"></label>
+    <label class="f" id="ed-paid-w">المدفوع الآن (اختياري)<input class="amt" type="text" inputmode="decimal" id="ed-paid" placeholder="0.00"></label>
     <label class="f" id="ed-phone-w">الهاتف (اختياري)<input type="text" inputmode="tel" id="ed-phone" style="direction:ltr;text-align:right"></label>
     <div class="actions" style="justify-content:flex-end">
       <button class="btn ghost small" type="button" id="ed-cancel">إلغاء</button>
@@ -748,33 +749,46 @@ document.addEventListener('click',async e=>{
     return;
   }
   b.disabled=true;
-  try{await delDoc(b.dataset.del,b.dataset.id);toast('تم الحذف');}
+  try{
+    const col=b.dataset.del,k=col==='sales'?'cust':col==='purchases'?'supp':null;
+    const rec=k?state[col].find(x=>x.id===b.dataset.id):null,lp=rec?linkedPay(k,rec):null;
+    await delDoc(col,b.dataset.id);
+    if(lp)await delDoc(KINDS[k].pays,lp.id);
+    toast(lp?'تم حذف العملية ودفعتها':'تم الحذف');
+  }
   catch(err){b.disabled=false;saveFailed(err);}
 });
 
 /* ---------- editing saved entries ---------- */
 const COLKIND={sales:'cust',payments:'cust',purchases:'supp',spays:'supp'};
 let edItem=null;
+// the payment recorded together with a sale or purchase ("المدفوع الآن")
+function linkedPay(k,rec){
+  const K=KINDS[k],party=rec[K.key];
+  if(!party)return null;
+  return state[K.pays].find(p=>(p.atSale||String(p.desc||'').indexOf('دفعة عند')===0)&&p[K.key]===party&&p.createdAt===(rec.createdAt||0)+1)||null;
+}
 const edShow=(sel,on)=>{$(sel).hidden=!on;};
 function openEdit(col,id){
   const r=state[col].find(x=>x.id===id),k=COLKIND[col];if(!r||!k)return;
   const K=KINDS[k],isDoc=col===K.docs,at=!!r.atSale||String(r.desc||'').indexOf('دفعة عند')===0;
-  edItem={mode:isDoc?'doc':'pay',k:k,col:col,id:id,rec:r,at:at};
+  const lp=isDoc?linkedPay(k,r):null;
+  edItem={mode:isDoc?'doc':'pay',k:k,col:col,id:id,rec:r,at:at,linked:lp};
   $('#ed-title').textContent=isDoc?(k==='cust'?'تعديل عملية بيع':'تعديل عملية شراء'):'تعديل دفعة';
-  edShow('#ed-date-w',true);edShow('#ed-party-w',isDoc);edShow('#ed-desc-w',isDoc||!at);edShow('#ed-amt-w',true);edShow('#ed-phone-w',false);
+  edShow('#ed-date-w',true);edShow('#ed-party-w',isDoc);edShow('#ed-desc-w',isDoc||!at);edShow('#ed-amt-w',true);edShow('#ed-paid-w',isDoc);edShow('#ed-phone-w',false);
   $('#ed-party-l').textContent=K.nameLabel+(k==='supp'?' (اختياري)':'');
   $('#ed-party').setAttribute('list',k+'-names');
   $('#ed-amt-l').textContent=isDoc?(k==='cust'?'قيمة البيع':'قيمة الشراء'):'مبلغ الدفعة';
   $('#ed-date').value=r.date||today();$('#ed-party').value=r[K.key]||'';
   $('#ed-desc').value=isDoc?(r.desc||''):((at||r.desc==='دفعة')?'':(r.desc||''));
-  $('#ed-amt').value=String(r.amount);
+  $('#ed-amt').value=String(r.amount);$('#ed-paid').value=lp?String(lp.amount):'';
   refreshDates();openDialog($('#ed'));
 }
 function openEditParty(k){
   const K=KINDS[k],c=partyList(k).find(x=>x.name===current[k]);if(!c)return;
   edItem={mode:'party',k:k,old:c};
   $('#ed-title').textContent='تعديل بيانات '+K.one;
-  edShow('#ed-date-w',false);edShow('#ed-party-w',true);edShow('#ed-desc-w',false);edShow('#ed-amt-w',false);edShow('#ed-phone-w',true);
+  edShow('#ed-date-w',false);edShow('#ed-party-w',true);edShow('#ed-desc-w',false);edShow('#ed-amt-w',false);edShow('#ed-paid-w',false);edShow('#ed-phone-w',true);
   $('#ed-party-l').textContent=K.nameLabel;$('#ed-party').removeAttribute('list');
   $('#ed-party').value=c.name;$('#ed-phone').value=c.phone||'';
   openDialog($('#ed'));
@@ -806,15 +820,20 @@ $('#f-ed').addEventListener('submit',async e=>{
       if(it.mode==='pay'){
         await updDoc(it.col,it.id,{date:date,amount:amount,desc:it.at?it.rec.desc:(desc||'دفعة')});
       }else{
-        const party=norm($('#ed-party').value),old=it.rec[K.key]||'';
+        const party=norm($('#ed-party').value);
+        const paidRaw=$('#ed-paid').value.trim(),paid=paidRaw?parseAmount(paidRaw):0;
         if(it.k==='cust'&&!party)return bad('#ed-party',K.needName);
         if(!desc)return bad('#ed-desc','اكتب البيان.');
+        if(paidRaw&&!(paid>=0))return bad('#ed-paid','المبلغ المدفوع غير صحيح.');
+        if(paid>0&&!party)return bad('#ed-party','اكتب اسم المورّد ليُسجَّل المدفوع في حسابه.');
         if(party)await ensureParty(it.k,party);
         const patch={date:date,desc:desc,amount:amount};patch[K.key]=party;
-        // the payment made at the time of this sale or purchase follows it
-        const linked=state[K.pays].find(p=>p.atSale&&p[K.key]===old&&old&&p.createdAt===(it.rec.createdAt||0)+1);
         await updDoc(it.col,it.id,patch);
-        if(linked&&party){const lp={date:date};lp[K.key]=party;await updDoc(K.pays,linked.id,lp);}
+        // keep the payment made with this sale or purchase in step with it
+        const lp=it.linked,payDesc='دفعة '+K.atWord+': '+desc;
+        if(lp&&paid>0){const q={date:date,amount:paid,desc:payDesc,atSale:true};q[K.key]=party;await updDoc(K.pays,lp.id,q);}
+        else if(lp){await delDoc(K.pays,lp.id);}
+        else if(paid>0){const q={date:date,amount:paid,desc:payDesc,atSale:true,createdAt:(it.rec.createdAt||Date.now())+1};q[K.key]=party;await addDoc(K.pays,q);}
       }
     }
     edItem=null;$('#ed').close();toast('حُفظ التعديل');
