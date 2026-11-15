@@ -22,7 +22,7 @@
 <meta property="og:image:height" content="512">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:image" content="https://atigh85.github.io/daftar/icons/icon-512.png">
-<script>window.DAFTAR_LOCAL=true;window.DAFTAR_BUILD="2026-11-15 12:57";</script>
+<script>window.DAFTAR_LOCAL=true;window.DAFTAR_BUILD="2026-11-15 13:06";</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Reem+Kufi:wght@600;700&display=swap" rel="stylesheet">
 <style>
@@ -313,6 +313,7 @@ dialog h2{margin:0;font-size:18px}
 
 <dialog id="mo">
   <h2 id="mo-title"></h2>
+  <label class="f" id="mo-pick" style="margin-bottom:12px">اختر الشهر<select id="mo-sel"></select></label>
   <div id="mo-body"></div>
   <div class="actions" style="justify-content:flex-end">
     <button class="btn small" type="button" id="mo-close">إغلاق</button>
@@ -727,22 +728,34 @@ document.addEventListener('click',async e=>{
 });
 
 /* ---------- monthly payments ---------- */
-function showMonthly(k){
-  const K=KINDS[k],pays=state[K.pays].slice().sort(byNewest),groups=new Map();
-  pays.forEach(p=>{const m=String(p.date||'').slice(0,7);if(!groups.has(m))groups.set(m,[]);groups.get(m).push(p);});
-  $('#mo-title').textContent=K.monthlyTitle;
-  const keys=Array.from(groups.keys()).sort().reverse();
-  $('#mo-body').innerHTML=!keys.length?'<p class="empty">'+K.monthlyEmpty+'</p>':
-    '<div class="fig due" style="margin-bottom:10px"><div class="lbl">مجموع كل الدفعات</div><div class="val">'+money(sumC(pays))+'</div></div>'+
-    keys.map((m,i)=>{
-      const list=groups.get(m),mm=/^(\d{4})-(\d{2})$/.exec(m),title=mm&&MONTHS[+mm[2]-1]?MONTHS[+mm[2]-1]+' '+mm[1]:(m||'بدون تاريخ');
-      return '<details class="mo"'+(i===0?' open':'')+'><summary><span>'+esc(title)+' <small>('+list.length+')</small></span><span class="credit"><bdi dir="ltr">'+fmt(sumC(list))+'</bdi> <small>'+esc(cur())+'</small></span></summary>'+
-        '<table><thead><tr><th>التاريخ</th><th>'+K.one+'</th><th class="num">المبلغ</th></tr></thead><tbody>'+
-        list.map(p=>'<tr><td class="date">'+dt(p.date)+'</td><td class="desc">'+esc(p[K.key])+'</td>'+mc(cents(p.amount),'credit')+'</tr>').join('')+
-        '</tbody></table></details>';
-    }).join('');
-  openDialog($('#mo'));$('#mo-body').scrollTop=0;
+let moKind=null;
+const monthName=m=>{const x=/^(\d{4})-(\d{2})$/.exec(m);return x&&MONTHS[+x[2]-1]?MONTHS[+x[2]-1]+' '+x[1]:'بدون تاريخ';};
+function monthGroups(k){
+  const g=new Map();
+  state[KINDS[k].pays].slice().sort(byNewest).forEach(p=>{const m=String(p.date||'').slice(0,7);if(!g.has(m))g.set(m,[]);g.get(m).push(p);});
+  return g;
 }
+function showMonthly(k){
+  const K=KINDS[k],g=monthGroups(k),keys=Array.from(g.keys()).sort().reverse();
+  moKind=k;
+  $('#mo-title').textContent=K.monthlyTitle;
+  $('#mo-pick').hidden=!keys.length;
+  $('#mo-sel').innerHTML=keys.map(m=>'<option value="'+esc(m)+'">'+esc(monthName(m))+' ('+g.get(m).length+')</option>').join('');
+  const now=today().slice(0,7);if(keys.indexOf(now)>=0)$('#mo-sel').value=now;
+  renderMonth();
+  openDialog($('#mo'));
+}
+function renderMonth(){
+  const K=KINDS[moKind],g=monthGroups(moKind),m=$('#mo-sel').value,list=g.get(m)||[];
+  if(!g.size){$('#mo-body').innerHTML='<p class="empty">'+K.monthlyEmpty+'</p>';return;}
+  $('#mo-body').innerHTML=
+    '<div class="fig due" style="margin-bottom:10px"><div class="lbl">مجموع دفعات '+esc(monthName(m))+'</div><div class="val">'+money(sumC(list))+'</div></div>'+
+    '<table><thead><tr><th>التاريخ</th><th>'+K.one+'</th><th class="num">المبلغ</th></tr></thead><tbody>'+
+    list.map(p=>'<tr><td class="date">'+dt(p.date)+'</td><td class="desc">'+esc(p[K.key])+'</td>'+mc(cents(p.amount),'credit')+'</tr>').join('')+
+    '<tr class="total"><td colspan="2">الإجمالي</td>'+mc(sumC(list),'credit',1)+'</tr></tbody></table>';
+  $('#mo-body').scrollTop=0;
+}
+$('#mo-sel').addEventListener('change',renderMonth);
 $('#mo-close').addEventListener('click',()=>$('#mo').close());
 
 /* ---------- command box: one sentence in, the matching form filled for review ---------- */
