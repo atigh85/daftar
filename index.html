@@ -22,7 +22,7 @@
 <meta property="og:image:height" content="512">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:image" content="https://atigh85.github.io/daftar/icons/icon-512.png">
-<script>window.DAFTAR_LOCAL=true;window.DAFTAR_BUILD="2026-11-15 14:04";</script>
+<script>window.DAFTAR_LOCAL=true;window.DAFTAR_BUILD="2026-11-15 14:07";</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Reem+Kufi:wght@600;700&display=swap" rel="stylesheet">
 <style>
@@ -613,8 +613,8 @@ function renderParty(k){
   const hits=q?matchNames(k,q):null;
   const rows=hits?all.filter(x=>hits.indexOf(x.name)>=0):all;
   if(!rows.length){$('#'+k+'-list').innerHTML='<p class="empty">'+(q?K.noMatch:K.emptyReg)+'</p>';return;}
-  $('#'+k+'-list').innerHTML='<table class="two"><thead><tr><th class="c-main">'+K.one+'</th><th class="num">المستحقات</th><th class="num">المدفوعات</th><th class="num">الباقي</th></tr></thead><tbody>'+
-    rows.map(x=>'<tr><td class="c-main">'+partyLink(k,x.name)+' '+balanceWords(x.bal,k).pill+'</td>'+mc(x.debit)+mc(x.credit,'credit')+mc(x.bal,'',1)+'</tr>').join('')+
+  $('#'+k+'-list').innerHTML='<table class="led"><thead><tr><th>'+K.one+'</th><th class="num">المستحقات</th><th class="num">المدفوعات</th><th class="num">الباقي</th></tr></thead><tbody>'+
+    rows.map(x=>'<tr><td class="c-main"><span class="what">'+partyLink(k,x.name)+'</span><span class="meta">'+balanceWords(x.bal,k).pill+'</span></td>'+mc(x.debit)+mc(x.credit,'credit')+mc(x.bal,'',1)+'</tr>').join('')+
     '</tbody></table>';
 }
 function renderDetail(k,c){
