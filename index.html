@@ -22,7 +22,7 @@
 <meta property="og:image:height" content="512">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:image" content="https://atigh85.github.io/daftar/icons/icon-512.png">
-<script>window.DAFTAR_LOCAL=true;window.DAFTAR_BUILD="2026-11-15 13:26";</script>
+<script>window.DAFTAR_LOCAL=true;window.DAFTAR_BUILD="2026-11-15 13:36";</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Reem+Kufi:wght@600;700&display=swap" rel="stylesheet">
 <style>
@@ -72,6 +72,12 @@ html{-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
 .btn:disabled{opacity:.5;cursor:not-allowed}
 .link{border:0;background:none;color:var(--accent);padding:0;font-weight:600;text-align:start}
 .del{border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:6px;padding:2px 10px;font-size:13px;white-space:nowrap}
+.sugwrap{position:relative;display:block;min-width:0}
+.bar .sugwrap{flex:1 1 160px;max-width:220px}
+.bar .sugwrap input{max-width:none}
+.sug{position:absolute;inset-inline:0;top:calc(100% + 4px);z-index:30;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.14);max-height:250px;overflow:auto;padding:4px}
+.sug button{display:block;width:100%;text-align:start;border:0;background:none;color:var(--ink);padding:10px 12px;border-radius:8px;font:inherit}
+.sug button:hover,.sug button:focus-visible{background:var(--accent-soft)}
 .acts{display:flex;flex-direction:column;gap:4px;align-items:flex-start}
 .del.armed,.btn.armed{border-color:var(--bad);background:var(--bad-soft);color:var(--bad)}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
@@ -597,7 +603,8 @@ function renderParty(k){
   $('#'+k+'-detail').style.display=c?'flex':'none';$('#'+k+'-index').style.display=c?'none':'flex';
   if(c){renderDetail(k,c);return;}
   const q=norm($('#'+k+'-q').value);
-  const rows=all.filter(x=>!q||x.name.includes(q));
+  const hits=q?matchNames(k,q):null;
+  const rows=hits?all.filter(x=>hits.indexOf(x.name)>=0):all;
   if(!rows.length){$('#'+k+'-list').innerHTML='<p class="empty">'+(q?K.noMatch:K.emptyReg)+'</p>';return;}
   $('#'+k+'-list').innerHTML='<table class="two"><thead><tr><th class="c-main">'+K.one+'</th><th class="num">المستحقات</th><th class="num">المدفوعات</th><th class="num">الباقي</th></tr></thead><tbody>'+
     rows.map(x=>'<tr><td class="c-main">'+partyLink(k,x.name)+' '+balanceWords(x.bal,k).pill+'</td>'+mc(x.debit)+mc(x.credit,'credit')+mc(x.bal,'',1)+'</tr>').join('')+
@@ -626,9 +633,9 @@ function showTab(){
   TABS.forEach(x=>{$('#v-'+x).classList.toggle('on',x===t);});
   document.querySelectorAll('nav.tabs a').forEach(a=>{if(a.dataset.tab===t)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current');});
 }
-window.addEventListener('hashchange',()=>{showTab();window.scrollTo(0,0);});
+window.addEventListener('hashchange',()=>{clearSearch();showTab();window.scrollTo(0,0);});
 function openParty(k,name){
-  current[k]=name;renderParty(k);
+  current[k]=name;clearSearch();
   const tab=KINDS[k].tab;
   if(location.hash!=='#'+tab)location.hash=tab;else showTab();
   window.scrollTo(0,0);
@@ -657,6 +664,38 @@ $('#pv-ok').textContent=LOCAL?'إرسال':'تنزيل';
   inp.addEventListener('click',()=>{try{if(inp.showPicker)inp.showPicker();}catch(e){}});
   inp._up();
 });
+function matchNames(k,text){
+  const q=nrm(norm(text));if(!q)return[];
+  const names=partyList(k).map(c=>c.name);
+  return names.filter(n=>nrm(n).startsWith(q)).concat(names.filter(n=>!nrm(n).startsWith(q)&&(' '+nrm(n)).includes(' '+q)));
+}
+function suggest(sel,kind){
+  const inp=$(sel),w=document.createElement('span'),box=document.createElement('div');
+  inp.removeAttribute('list');
+  w.className='sugwrap';box.className='sug';box.hidden=true;
+  inp.parentNode.insertBefore(w,inp);w.appendChild(inp);w.appendChild(box);
+  let picked=false;
+  const show=()=>{
+    const k=typeof kind==='function'?kind():kind;
+    if(picked){picked=false;box.hidden=true;return;}
+    const m=k?matchNames(k,inp.value).slice(0,8):[];
+    if(!m.length||(m.length===1&&m[0]===norm(inp.value))){box.hidden=true;return;}
+    box.innerHTML=m.map(n=>'<button type="button" data-n="'+esc(n)+'">'+esc(n)+'</button>').join('');
+    box.hidden=false;
+  };
+  inp.addEventListener('input',show);inp.addEventListener('focus',show);
+  inp.addEventListener('blur',()=>setTimeout(()=>{box.hidden=true;},180));
+  box.addEventListener('pointerdown',e=>e.preventDefault());
+  box.addEventListener('click',e=>{
+    const b=e.target.closest('button');if(!b)return;
+    inp.value=b.dataset.n;picked=true;box.hidden=true;
+    inp.dispatchEvent(new Event('input',{bubbles:true}));
+  });
+}
+function clearSearch(){
+  ['#sales-q','#purch-q','#cust-q','#supp-q'].forEach(q=>{$(q).value='';});
+  renderSales();renderPurchases();KS.forEach(renderParty);
+}
 const refreshDates=()=>document.querySelectorAll('.datewrap input').forEach(i=>i._up());
 
 $('#f-sale').addEventListener('submit',async e=>{
@@ -700,7 +739,7 @@ $('#f-purchase').addEventListener('submit',async e=>{
 function pickParty(k){
   const K=KINDS[k],q=norm($('#'+k+'-q').value),all=partyList(k);
   let c=all.find(x=>x.name===q);
-  if(!c&&q){const m=all.filter(x=>x.name.includes(q));if(m.length===1)c=m[0];}
+  if(!c&&q){const m=matchNames(k,q);if(m.length===1)c=all.find(x=>x.name===m[0]);}
   if(!c&&!q&&all.length===1)c=all[0];
   if(!c){bad('#'+k+'-q',q?K.pickFull:K.pickFirst);return null;}
   return c;
@@ -725,12 +764,14 @@ KS.forEach(k=>{
     catch(err){saveFailed(err);}
   });
   $('#'+k+'-q').addEventListener('input',()=>renderParty(k));
-  $('#'+k+'-img').addEventListener('click',()=>{const c=pickParty(k);if(c)buildStatement(k,c.name).catch(()=>toast('تعذّر إنشاء الصورة.',true));});
+  $('#'+k+'-img').addEventListener('click',()=>{const c=pickParty(k);if(!c)return;buildStatement(k,c.name).catch(()=>toast('تعذّر إنشاء الصورة.',true));$('#'+k+'-q').value='';renderParty(k);});
   $('#'+k+'-monthly').addEventListener('click',()=>showMonthly(k));
   $('#'+k+'-back').addEventListener('click',()=>{current[k]=null;renderParty(k);window.scrollTo(0,0);});
   $('#'+k+'-expimg').addEventListener('click',()=>{if(current[k])buildStatement(k,current[k]).catch(()=>toast('تعذّر إنشاء الصورة.',true));});
   $('#'+k+'-expdebt').addEventListener('click',()=>{if(current[k])buildInvoice(k,current[k]).catch(()=>toast('تعذّر إنشاء الفاتورة.',true));});
 });
+suggest('#cust-q','cust');suggest('#supp-q','supp');suggest('#s-cust','cust');suggest('#p-supp','supp');
+suggest('#ed-party',()=>edItem&&edItem.mode==='doc'?edItem.k:null);
 $('#sales-q').addEventListener('input',renderSales);
 $('#purch-q').addEventListener('input',renderPurchases);
 
